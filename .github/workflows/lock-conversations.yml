@@ -1,0 +1,57 @@
+name: Lock issue and PR conversations
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lock new or previously missed conversations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          lock() {
+            local number="$1"
+            if ! gh api -X PUT "repos/$GITHUB_REPOSITORY/issues/$number/lock" --silent; then
+              echo "::error::Failed to lock issue/PR #$number"
+              return 1
+            fi
+
+            local locked
+            if ! locked=$(gh api "repos/$GITHUB_REPOSITORY/issues/$number" --jq '.locked'); then
+              echo "::error::Failed to verify issue/PR #$number"
+              return 1
+            fi
+            if [[ "$locked" != true ]]; then
+              echo "::error::Issue/PR #$number remains unlocked"
+              return 1
+            fi
+            echo "Locked issue/PR #$number"
+          }
+
+          if [[ "$GITHUB_EVENT_NAME" == issues || "$GITHUB_EVENT_NAME" == pull_request_target ]]; then
+            number=$(jq -er '.issue.number // .pull_request.number' "$GITHUB_EVENT_PATH")
+            lock "$number"
+          else
+            unlocked=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues?state=all&per_page=100" --jq '.[] | select(.locked == false) | .number')
+            failed=0
+            if [[ -n "$unlocked" ]]; then
+              while IFS= read -r number; do
+                lock "$number" || failed=1
+              done <<< "$unlocked"
+            fi
+            exit "$failed"
+          fi
