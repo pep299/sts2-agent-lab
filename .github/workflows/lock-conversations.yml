@@ -25,7 +25,7 @@ jobs:
 
           lock() {
             local number="$1"
-            if ! gh api -X PUT "repos/$GITHUB_REPOSITORY/issues/$number/lock" --silent; then
+            if ! gh api -X PUT "repos/$GITHUB_REPOSITORY/issues/$number/lock" --input - --silent <<< '{}'; then
               echo "::error::Failed to lock issue/PR #$number"
               return 1
             fi
