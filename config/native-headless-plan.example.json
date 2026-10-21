@@ -1,0 +1,4 @@
+[
+  {"seed": "SAMPLE0001", "runSeconds": 600, "maxSteps": 5000},
+  {"seed": "SAMPLE0002", "runSeconds": 600, "maxSteps": 5000}
+]
