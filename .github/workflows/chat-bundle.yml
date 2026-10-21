@@ -22,7 +22,8 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
-      - run: make build-all
+      - run: make setup
+      - run: dotnet build external/sts2-sim/Sts2Sim.sln -c Release
       - run: bash scripts/package-chat.sh
       - name: Check bundle size (500 MB)
         run: test "$(stat -c%s dist/sts2-chat.tar.gz)" -le 500000000
