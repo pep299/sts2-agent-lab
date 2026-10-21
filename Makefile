@@ -8,4 +8,4 @@ setup:
 build-all: build-sim
 
 build-sim:
-	dotnet test $(SIM) -c Release
+	dotnet build $(SIM) -c Release
