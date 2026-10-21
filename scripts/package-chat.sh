@@ -11,4 +11,5 @@ git ls-files --recurse-submodules -z |
 cp -a external/sts2-sim/src/Sts2Sim.Core/bin/Release/net9.0/. "$bundle/sim/"
 
 cp packaging/NuGet.Offline.Config "$bundle/NuGet.Config"
-tar -C "$bundle" -czf dist/sts2-chat.tar.gz dotnet nuget source sim NuGet.Config
+cp packaging/chat-dotnet "$bundle/chat-dotnet"
+tar -C "$bundle" -czf dist/sts2-chat.tar.gz dotnet nuget source sim NuGet.Config chat-dotnet

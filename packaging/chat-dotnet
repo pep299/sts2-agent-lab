@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+bundle="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export DOTNET_ROOT="$bundle/dotnet"
+export NUGET_PACKAGES="$bundle/nuget"
+
+unset PLATFORM
+if [[ ! -d "${XDG_RUNTIME_DIR:-}" || ! -w "${XDG_RUNTIME_DIR:-}" ]]; then
+  unset XDG_RUNTIME_DIR
+fi
+
+exec "$DOTNET_ROOT/dotnet" "$@"
