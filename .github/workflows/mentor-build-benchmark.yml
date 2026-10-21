@@ -17,9 +17,6 @@ jobs:
       matrix:
         profile: [upstream, local]
         parallelism: [one, all]
-    env:
-      CARGO_HOME: ${{ runner.temp }}/mentor-cargo
-      CARGO_TARGET_DIR: ${{ runner.temp }}/mentor-target
     steps:
       - name: Check out fixed Mentor source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -31,6 +28,8 @@ jobs:
       - name: Record machine and toolchain
         working-directory: sts2-rs
         run: |
+          echo "CARGO_HOME=$RUNNER_TEMP/mentor-cargo" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/mentor-target" >> "$GITHUB_ENV"
           mkdir -p "$RUNNER_TEMP/benchmark"
           {
             git rev-parse HEAD
