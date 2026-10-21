@@ -26,7 +26,11 @@ jobs:
       - run: dotnet build external/sts2-sim/Sts2Sim.sln -c Release
       - run: bash scripts/package-chat.sh
       - name: Check bundle size (500 MB)
-        run: test "$(stat -c%s dist/sts2-chat.tar.gz)" -le 500000000
+        run: |
+          du -h dist/sts2-chat.tar.gz
+          bytes=$(stat -c%s dist/sts2-chat.tar.gz)
+          echo "Compressed bundle bytes: $bytes"
+          test "$bytes" -le 500000000
 
       - name: Upload
         id: upload
