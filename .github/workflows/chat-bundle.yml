@@ -22,6 +22,7 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
+      - run: make setup
       - run: make build-all
       - run: bash scripts/package-chat.sh
       - name: Check bundle size (500 MB)
