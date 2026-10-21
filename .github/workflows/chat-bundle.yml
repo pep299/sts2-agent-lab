@@ -28,6 +28,16 @@ jobs:
       - name: Check bundle size (500 MB)
         run: test "$(stat -c%s dist/sts2-chat.tar.gz)" -le 500000000
 
+      - name: Smoke test Chat bundle with problematic environment
+        env:
+          PLATFORM: linux/amd64
+          XDG_RUNTIME_DIR: ${{ runner.temp }}/nonexistent-runtime
+        run: |
+          "$RUNNER_TEMP/sts2-chat/chat-dotnet" build \
+            "$RUNNER_TEMP/sts2-chat/source/external/sts2-sim/Sts2Sim.sln" \
+            -c Release \
+            -p:RestoreConfigFile="$RUNNER_TEMP/sts2-chat/NuGet.Config"
+
       - name: Upload
         id: upload
         if: github.ref == 'refs/heads/main'
