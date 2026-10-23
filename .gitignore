@@ -1,0 +1,15 @@
+/local/
+/config/*.local.toml
+/dist/
+**/bin/
+**/obj/
+**/__pycache__/
+*.pyc
+.venv/
+.DS_Store
+*.app/
+*.pck
+*.dll
+*.save
+*.private.json
+*.private.jsonl

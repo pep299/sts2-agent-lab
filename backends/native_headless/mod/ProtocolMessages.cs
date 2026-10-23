@@ -1,0 +1,390 @@
+using System.Text.Json.Serialization;
+
+namespace Sts2.NativeSim.FullAppBridge;
+
+public sealed class RpcRequest
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("method")]
+    public string Method { get; set; } = "";
+
+    [JsonPropertyName("params")]
+    public Dictionary<string, object?>? Params { get; set; }
+}
+
+public sealed class RpcResponse
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("result")]
+    public object? Result { get; set; }
+
+    [JsonPropertyName("error")]
+    public string? Error { get; set; }
+}
+
+public sealed class LegalActionDto
+{
+    [JsonPropertyName("action_id")]
+    public string ActionId { get; set; } = "";
+
+    [JsonPropertyName("action_type")]
+    public string ActionType { get; set; } = "";
+
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = "";
+
+    [JsonPropertyName("metadata")]
+    public Dictionary<string, object?>? Metadata { get; set; }
+}
+
+public sealed class ObservationDto
+{
+    [JsonPropertyName("schema_version")]
+    public int SchemaVersion { get; set; } = 2;
+
+    [JsonPropertyName("phase")]
+    public string Phase { get; set; } = "";
+
+    [JsonPropertyName("is_terminal")]
+    public bool IsTerminal { get; set; }
+
+    [JsonPropertyName("is_victory")]
+    public bool IsVictory { get; set; }
+
+    [JsonPropertyName("seed")]
+    public string Seed { get; set; } = "";
+
+    [JsonPropertyName("character")]
+    public string Character { get; set; } = "";
+
+    [JsonPropertyName("ascension")]
+    public int Ascension { get; set; }
+
+    [JsonPropertyName("act")]
+    public int Act { get; set; }
+
+    // spire-jev: the act's boss, as the map shows it from the start of the act (and the second one
+    // of act 3 at A10), so the deck can be built for it.
+    [JsonPropertyName("act_boss")]
+    public string ActBoss { get; set; } = "";
+
+    [JsonPropertyName("act_second_boss")]
+    public string ActSecondBoss { get; set; } = "";
+
+    [JsonPropertyName("floor")]
+    public int Floor { get; set; }
+
+    // spire-jev: the engine's frame count when the observation was made; under Movie Maker a frame
+    // of the recording each, so a recording can be cut at a floor or a fight.
+    [JsonPropertyName("frame")]
+    public ulong Frame { get; set; }
+
+    [JsonPropertyName("gold")]
+    public int Gold { get; set; }
+
+    [JsonPropertyName("player_hp")]
+    public int PlayerHp { get; set; }
+
+    [JsonPropertyName("player_max_hp")]
+    public int PlayerMaxHp { get; set; }
+
+    [JsonPropertyName("player_block")]
+    public int PlayerBlock { get; set; }
+
+    [JsonPropertyName("player_energy")]
+    public int PlayerEnergy { get; set; }
+
+    // spire-jev: the Regent's second resource, spent by cards with a star cost.
+    [JsonPropertyName("player_stars")]
+    public int PlayerStars { get; set; }
+
+    [JsonPropertyName("player_powers")]
+    public Dictionary<string, int> PlayerPowers { get; set; } = new();
+
+    // spire-jev: each power's own numbers beside its amount (Shrink's damage
+    // decrease, say), for the powers whose effect is not just the amount.
+    [JsonPropertyName("player_power_vars")]
+    public Dictionary<string, Dictionary<string, double>> PlayerPowerVars { get; set; } = new();
+
+    [JsonPropertyName("deck_cards")]
+    public List<string> DeckCards { get; set; } = new();
+
+    [JsonPropertyName("relics")]
+    public List<string> Relics { get; set; } = new();
+
+    // spire-jev: each relic's numbers and counters (Tuning Fork's skills played so far).
+    [JsonPropertyName("relic_vars")]
+    public Dictionary<string, Dictionary<string, double>> RelicVars { get; set; } = new();
+
+    [JsonPropertyName("potions")]
+    public List<string> Potions { get; set; } = new();
+
+    // spire-jev: how many slots there are, and each potion held with its numbers.
+    [JsonPropertyName("potion_slots")]
+    public int PotionSlots { get; set; }
+
+    [JsonPropertyName("potion_details")]
+    public List<Dictionary<string, object?>> PotionDetails { get; set; } = new();
+
+    // spire-jev: the creatures on the player's side other than the player — the Necrobinder's Osty,
+    // an event's pet. Left out when there are none, so other characters' observations are unchanged.
+    [JsonPropertyName("player_allies")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<AllyObservationDto>? PlayerAllies { get; set; }
+
+    // spire-jev: the Defect's orbs, front (the next evoked) first, and how many slots there are. Left
+    // out for a player with no slots and no orbs, so other characters' observations are unchanged.
+    [JsonPropertyName("player_orbs")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<OrbObservationDto>? PlayerOrbs { get; set; }
+
+    [JsonPropertyName("orb_slots")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? OrbSlots { get; set; }
+
+    [JsonPropertyName("combat")]
+    public CombatObservationDto? Combat { get; set; }
+
+    [JsonPropertyName("room")]
+    public RoomObservationDto? Room { get; set; }
+
+}
+
+public sealed class CombatObservationDto
+{
+    [JsonPropertyName("turn")]
+    public int Turn { get; set; }
+
+    [JsonPropertyName("hand")]
+    public List<CardObservationDto> Hand { get; set; } = new();
+
+    [JsonPropertyName("draw_pile_count")]
+    public int DrawPileCount { get; set; }
+
+    [JsonPropertyName("discard_pile_count")]
+    public int DiscardPileCount { get; set; }
+
+    [JsonPropertyName("exhaust_pile_count")]
+    public int ExhaustPileCount { get; set; }
+
+    [JsonPropertyName("enemies")]
+    public List<EnemyObservationDto> Enemies { get; set; } = new();
+
+    // spire-jev: the piles' contents, not just their sizes. The draw pile is
+    // listed in pile order, but a planner that respects hidden information
+    // should treat it as a multiset — the player cannot see the order.
+    [JsonPropertyName("draw_pile")]
+    public List<CardObservationDto> DrawPile { get; set; } = new();
+
+    [JsonPropertyName("discard_pile")]
+    public List<CardObservationDto> DiscardPile { get; set; } = new();
+
+    [JsonPropertyName("exhaust_pile")]
+    public List<CardObservationDto> ExhaustPile { get; set; } = new();
+
+    [JsonPropertyName("max_energy")]
+    public int MaxEnergy { get; set; }
+}
+
+public sealed class CardObservationDto
+{
+    [JsonPropertyName("index")]
+    public int Index { get; set; }
+
+    [JsonPropertyName("card_id")]
+    public string CardId { get; set; } = "";
+
+    [JsonPropertyName("cost")]
+    public int Cost { get; set; }
+
+    [JsonPropertyName("can_play")]
+    public bool CanPlay { get; set; }
+
+    [JsonPropertyName("target_type")]
+    public string TargetType { get; set; } = "";
+
+    [JsonPropertyName("upgrades")]
+    public int Upgrades { get; set; }
+
+    // spire-jev: what the card will do. `cost` above is the canonical cost;
+    // this is the cost after this turn's modifiers.
+    [JsonPropertyName("current_cost")]
+    public int CurrentCost { get; set; }
+
+    [JsonPropertyName("costs_x")]
+    public bool CostsX { get; set; }
+
+    // spire-jev: the Regent's star cost, -1 for a card without one: the card's own
+    // (upgrades included), and the cost this turn with every modifier (for an X
+    // star cost, the stars there are).
+    [JsonPropertyName("star_cost")]
+    public int StarCost { get; set; } = -1;
+
+    [JsonPropertyName("current_star_cost")]
+    public int CurrentStarCost { get; set; } = -1;
+
+    [JsonPropertyName("star_cost_x")]
+    public bool StarCostX { get; set; }
+
+    [JsonPropertyName("keywords")]
+    public List<string> Keywords { get; set; } = new();
+
+    /// <summary>Base values of the card's dynamic variables (Damage, Block, Vulnerable, Cards, …), before strength, weak and the like.</summary>
+    [JsonPropertyName("vars")]
+    public Dictionary<string, int> Vars { get; set; } = new();
+
+    [JsonPropertyName("card_type")]
+    public string CardType { get; set; } = "";
+
+    // spire-jev: for choosing cards outside combat.
+    [JsonPropertyName("rarity")]
+    public string Rarity { get; set; } = "";
+
+    // spire-jev, hand cards only: the card glows gold when its condition holds
+    // (Spite once you have lost HP this turn), and a calculated var's value as
+    // the game computes it now (Body Slam's damage from your block).
+    [JsonPropertyName("glows")]
+    public bool GlowsGold { get; set; }
+
+    [JsonPropertyName("calculated")]
+    public Dictionary<string, int> Calculated { get; set; } = new();
+
+    // spire-jev: an enchantment changes a card's numbers for the rest of the
+    // run (Nutritious Soup's on Strikes). Its id and amount, and every var
+    // whose enchanted value is not its base value.
+    [JsonPropertyName("enchantment")]
+    public string Enchantment { get; set; } = "";
+
+    [JsonPropertyName("enchantment_amount")]
+    public int EnchantmentAmount { get; set; }
+
+    [JsonPropertyName("enchanted")]
+    public Dictionary<string, int> Enchanted { get; set; } = new();
+
+    // The enchantment's own numbers (Corrupted's damage to you).
+    [JsonPropertyName("enchantment_vars")]
+    public Dictionary<string, double> EnchantmentVars { get; set; } = new();
+
+    // spire-jev, hand cards only: numbers the card's own class keeps (Thrash's extra damage).
+    [JsonPropertyName("fields")]
+    public Dictionary<string, double> Fields { get; set; } = new();
+
+    // spire-jev: an affliction on the card for this combat (Bound, from the
+    // Queen's Chains of Binding: one Bound card can be played a turn), and its amount.
+    [JsonPropertyName("affliction")]
+    public string Affliction { get; set; } = "";
+
+    [JsonPropertyName("affliction_amount")]
+    public int AfflictionAmount { get; set; }
+}
+
+public sealed class EnemyObservationDto
+{
+    [JsonPropertyName("combat_id")]
+    public ulong CombatId { get; set; }
+
+    [JsonPropertyName("model_id")]
+    public string ModelId { get; set; } = "";
+
+    [JsonPropertyName("hp")]
+    public int Hp { get; set; }
+
+    [JsonPropertyName("max_hp")]
+    public int MaxHp { get; set; }
+
+    [JsonPropertyName("block")]
+    public int Block { get; set; }
+
+    [JsonPropertyName("is_alive")]
+    public bool IsAlive { get; set; }
+
+    [JsonPropertyName("intent")]
+    public string Intent { get; set; } = "";
+
+    [JsonPropertyName("powers")]
+    public Dictionary<string, int> Powers { get; set; } = new();
+
+    [JsonPropertyName("power_vars")]
+    public Dictionary<string, Dictionary<string, double>> PowerVars { get; set; } = new();
+
+    // spire-jev: what the move will do, as the game shows it — attack damage
+    // per hit against the player, with strength, weak and vulnerable applied.
+    [JsonPropertyName("intents")]
+    public List<IntentObservationDto> Intents { get; set; } = new();
+}
+
+public sealed class AllyObservationDto
+{
+    [JsonPropertyName("combat_id")]
+    public ulong CombatId { get; set; }
+
+    [JsonPropertyName("model_id")]
+    public string ModelId { get; set; } = "";
+
+    /// <summary>The player's Osty (`Player.Osty`), as against any other pet.</summary>
+    [JsonPropertyName("is_osty")]
+    public bool IsOsty { get; set; }
+
+    [JsonPropertyName("hp")]
+    public int Hp { get; set; }
+
+    [JsonPropertyName("max_hp")]
+    public int MaxHp { get; set; }
+
+    [JsonPropertyName("block")]
+    public int Block { get; set; }
+
+    [JsonPropertyName("is_alive")]
+    public bool IsAlive { get; set; }
+
+    [JsonPropertyName("powers")]
+    public Dictionary<string, int> Powers { get; set; } = new();
+
+    [JsonPropertyName("power_vars")]
+    public Dictionary<string, Dictionary<string, double>> PowerVars { get; set; } = new();
+}
+
+public sealed class OrbObservationDto
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = "";
+
+    /// <summary>PassiveVal and EvokeVal as the game has them now (Focus in).</summary>
+    [JsonPropertyName("passive")]
+    public double Passive { get; set; }
+
+    [JsonPropertyName("evoke")]
+    public double Evoke { get; set; }
+
+    /// <summary>The numbers the orb's own class keeps: a Dark orb's _evokeVal, a Glass orb's _passiveVal.</summary>
+    [JsonPropertyName("fields")]
+    public Dictionary<string, double> Fields { get; set; } = new();
+}
+
+public sealed class IntentObservationDto
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "";
+
+    [JsonPropertyName("damage")]
+    public int Damage { get; set; }
+
+    [JsonPropertyName("hits")]
+    public int Hits { get; set; }
+}
+
+public sealed class RoomObservationDto
+{
+    [JsonPropertyName("room_type")]
+    public string RoomType { get; set; } = "";
+
+    [JsonPropertyName("options")]
+    public List<string> Options { get; set; } = new();
+
+    [JsonPropertyName("details")]
+    public Dictionary<string, object?> Details { get; set; } = new();
+}

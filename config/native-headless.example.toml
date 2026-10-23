@@ -1,0 +1,12 @@
+schema_version = 1
+
+[paths]
+local_root = "local/native_headless"
+source_app = "local/native_headless/inputs/SlayTheSpire2.app"
+progress = "local/native_headless/data/progress.save"
+settings = "local/native_headless/data/settings.save"
+dotnet = "dotnet"
+
+[qualification]
+game_sha256 = "9cb4f1ad8c9f284aa8fec3122ffd6d780bbf543d875c817abdd12ff63fbf12b4"
+progress_sha256 = "e9b398a6910c2351f1a17ce2e8f03218bda661f1644d1f1b9e7645807e7e700a"
