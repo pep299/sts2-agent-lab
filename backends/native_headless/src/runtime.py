@@ -34,6 +34,13 @@ class DeclaredLimit(EnvironmentFault):pass
 class Unsupported(EnvironmentFault):pass
 class RequestRejected(ValueError):pass
 
+def validate_mods(executable):
+    directory=Path(executable).parent/'mods'
+    if directory.is_symlink():raise EnvironmentFault('unqualified_mods:linked mods directory')
+    unexpected=[str(p.relative_to(directory)) for p in directory.rglob('*')
+                if p.is_symlink() or p.is_file() and p.suffix=='.json' and p.relative_to(directory)!=Path('spire-jev-bridge/spire-jev-bridge.json')]
+    if unexpected:raise EnvironmentFault('unqualified_mods:'+','.join(sorted(unexpected)))
+
 def unreviewed_native_errors(log):
     errors=[]
     for block in re.split(r'(?m)(?=^\[ERROR\])',log):
@@ -153,6 +160,7 @@ class NativeEnvironment:
 
     def start(self):
         exe=Path(self.manifest['executable'])
+        validate_mods(exe)
         for file,expected in [(exe,self.manifest['executableSha256']),(Path(self.manifest['gameData'])/'sts2.dll',GAME_HASH),
                               (exe.parent/'mods/spire-jev-bridge/spire-jev-bridge.dll',self.manifest['modSha256'])]:
             if sha(file)!=expected:raise EnvironmentFault('runtime_identity_changed:'+str(file))

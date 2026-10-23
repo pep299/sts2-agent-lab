@@ -17,12 +17,14 @@ public static class PublicObservation
     private static object R(object x, string name) => PublicData.Required(x, name);
     private static object? P(object? x, string name) => PublicData.Property(x, name);
     private static object[] Items(object? x) => PublicData.Items(x);
-    private static object Card(object card) => new { state = Cards.Read(card), rendered = (object?)null };
+    private static object Card(object card, bool assignIdentity = true) => new { state = Cards.Read(card, assignIdentity), rendered = (object?)null };
     private static object Pile(object pc, string name, bool unordered = false)
+        => ProjectPile(Items(R(R(pc, name), "Cards")), unordered);
+    internal static object ProjectPile(IEnumerable<object> source, bool unordered)
     {
-        var cards = Items(R(R(pc, name), "Cards"));
+        var cards = source.ToArray();
         if (unordered) cards = cards.OrderBy(Cards.SortKey, StringComparer.Ordinal).ToArray();
-        return new { count = cards.Length, order = unordered ? "unordered" : "pile_display", cards = cards.Select(Card).ToArray() };
+        return new { count = cards.Length, order = unordered ? "unordered" : "pile_display", cards = cards.Select(card => Card(card, !unordered)).ToArray() };
     }
     private static object[] Powers(object creature) => Items(R(creature, "Powers")).Where(p => (bool)R(p, "IsVisible")).Select(p => (object)new {
         id = PublicData.Id(p), amount = R(p, "DisplayAmount"), title = PublicData.Title(p), rules = PublicData.Localization(R(p, "Description")), dynamicVars = PublicData.DynamicVars(p),
@@ -121,7 +123,7 @@ public static class PublicObservation
                 treasure = raw.Phase == "treasure" && context is IReadOnlyList<RelicModel> treasures ? treasures.Select(PublicData.Relic).ToArray() : null,
                 rest = raw.Phase == "rest_site" ? Items(context).Select(option => new { id = R(option, "OptionId"), title = PublicData.Localization(R(option, "Title")),
                     description = PublicData.Localization(R(option, "Description")), enabled = R(option, "IsEnabled") }).ToArray() : null,
-                bundles = context is SpecialChoiceContext { Bundles: not null } bundleChoice ? bundleChoice.Bundles.Select((bundle, index) => new { index, cards = bundle.Select(Card).ToArray() }).ToArray() : null,
+                bundles = context is SpecialChoiceContext { Bundles: not null } bundleChoice ? bundleChoice.Bundles.Select((bundle, index) => new { index, cards = bundle.Select(card => Card(card)).ToArray() }).ToArray() : null,
                 relicChoices = context is SpecialChoiceContext { Relics: not null } relicChoice ? relicChoice.Relics.Select(PublicData.Relic).ToArray() : null,
                 terminal = raw.IsTerminal ? raw.IsVictory ? "victory" : "death" : null }, actions,
             publicHistory = new { coverage = "current_recorded_segment_only", shopOffers = OfferHistory.Values.ToArray() },

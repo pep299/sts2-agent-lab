@@ -52,6 +52,18 @@ def fixtures(output):
         env.step(candidate(env,'discard_potion',potion_id='STRENGTH_POTION'))
         assert all(s['potion'] is None for s in env.last['observation']['state']['status']['potionBelt']['slots'])
         checks.append('noncombat_potion_discard')
+        env.step('fixture:draw_order')
+        assert env.last['observation']['capabilities']['diagnosticFixtureResult']['permutation_invariant']
+        checks.append('draw_projection_invariant_under_identical_card_permutation')
+        for _ in range(30):
+            if env.last['observation']['state']['phase']=='combat':break
+            action=next(a['id'] for a in env.last['observation']['actions'] if not a['id'].startswith('fixture:') and a['id']!='choose_cards:')
+            env.step(action)
+        else:raise AssertionError('Fixture did not reach combat')
+        env.step('fixture:combat_potion')
+        env.step(candidate(env,'potion',potion_id='EXPLOSIVE_AMPOULE'))
+        assert env.last['observation']['state']['phase']=='rewards'
+        checks.append('lethal_potion_returns_native_rewards_boundary')
     return checked_case(output,'FIXTURE111',body,fixture=True)
 
 def natural_shop(output):

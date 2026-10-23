@@ -1,6 +1,7 @@
 using MegaCrit.Sts2.Core.AutoSlay.Helpers;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Context;
+using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Potions;
 using MegaCrit.Sts2.Core.Runs;
@@ -16,8 +17,9 @@ public static class FixtureActions
     public static Dictionary<string, object?> LastResult { get; private set; } = new();
     public static void Add(List<LegalActionDto> actions, string phase)
     {
-        if (!Enabled || phase != "event") return;
-        foreach (var name in new[] { "grid2", "bundle", "relic", "potions" })
+        if (!Enabled || phase is not ("event" or "combat")) return;
+        var names = phase == "combat" ? new[] { "combat_potion" } : new[] { "grid2", "bundle", "relic", "potions", "draw_order" };
+        foreach (var name in names)
             actions.Add(new LegalActionDto { ActionId = "fixture:" + name, ActionType = "fixture", Description = "Diagnostic native fixture: " + name });
     }
     public static async Task Apply(string action)
@@ -25,7 +27,27 @@ public static class FixtureActions
         if (!Enabled) throw new NotSupportedException("Fixture inputs disabled");
         var player = LocalContext.GetMe(RunManager.Instance!.DebugOnlyGetState())!;
         var cards = player.Deck.Cards.Take(4).ToList();
-        if (action == "fixture:grid2")
+        if (action == "fixture:draw_order")
+        {
+            var deck = player.Deck.Cards;
+            var projection = new Sts2Recorder.CardProjection();
+            if (!deck.GroupBy(card => projection.SortKey(card)).Any(group => group.Count() > 1))
+                throw new InvalidOperationException("Draw-order fixture needs identical card copies");
+            PublicObservation.ProjectPile(deck, false);
+            string before = System.Text.Json.JsonSerializer.Serialize(PublicObservation.ProjectPile(deck, true));
+            string reversed = System.Text.Json.JsonSerializer.Serialize(PublicObservation.ProjectPile(deck.Reverse(), true));
+            if (before != reversed) throw new InvalidOperationException("Hidden pile order changes public projection");
+            LastResult = new() { ["fixture"] = "draw_order", ["permutation_invariant"] = true };
+        }
+        else if (action == "fixture:combat_potion")
+        {
+            var combat = CombatManager.Instance!.DebugOnlyGetState()!;
+            foreach (var enemy in combat.HittableEnemies.ToArray()) await CreatureCmd.SetCurrentHp(enemy, 1);
+            if (!(await PotionCmd.TryToProcure<ExplosiveAmpoule>(player)).success)
+                throw new InvalidOperationException("Fixture potion could not be procured");
+            LastResult = new() { ["fixture"] = "combat_potion" };
+        }
+        else if (action == "fixture:grid2")
         {
             var context = new CardSelectContext { Purpose = "diagnostic_selector_two_cards", MinSelect = 2, MaxSelect = 2, Cards = cards };
             string selected = await FullAppBridgeServer.WaitForCoordinatorActionAsync("card_select", false, false, context);

@@ -212,6 +212,9 @@ public static class FullAppBridgeServer
             if (PotionActions.IsPotion(chosen))
             {
                 await PotionActions.Apply(chosen);
+                // 古い戦闘の判断を作り直さず、部屋ハンドラーの報酬・終端処理へ戻す。
+                if (phase == "combat" && MegaCrit.Sts2.Core.Combat.CombatManager.Instance?.IsInProgress != true)
+                    return "combat_finished";
                 continue;
             }
             return chosen;

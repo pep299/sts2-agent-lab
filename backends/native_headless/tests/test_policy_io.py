@@ -51,6 +51,35 @@ class PolicyIOTests(unittest.TestCase):
         policy=self.policy('import sys; sys.stdin.readline(); sys.stdout.write("x"*(1024*1024+1)); sys.stdout.flush()')
         with self.assertRaisesRegex(PolicyFault,'policy_response_too_large'):policy({'decision_id':1})
 
+    def test_failed_exchange_cannot_supply_the_next_runs_response(self):
+        source='''import sys,json,time
+for line in sys.stdin:
+    value=json.loads(line)
+    if value['action_id']=='old':time.sleep(.5)
+    print(json.dumps(value),flush=True)
+'''
+        for failure in ['policy_timeout','run_deadline']:
+            with self.subTest(failure=failure):
+                policy=self.policy(source,timeout=.15)
+                deadline=time.monotonic()+.1 if failure=='run_deadline' else None
+                expected=DeclaredLimit if deadline is not None else PolicyFault
+                with self.assertRaises(expected):policy({'action_id':'old'},run_deadline=deadline)
+                policy.timeout=1
+                self.assertEqual(policy({'action_id':'new'}),{'action_id':'new'})
+
+    def test_malformed_reply_cannot_leave_a_queued_response(self):
+        source='''import sys,json,time
+for line in sys.stdin:
+    value=json.loads(line)
+    if value['action_id']=='old':
+        print('invalid',flush=True)
+        time.sleep(.05)
+    print(json.dumps(value),flush=True)
+'''
+        policy=self.policy(source)
+        with self.assertRaisesRegex(PolicyFault,'policy_response_not_json'):policy({'action_id':'old'})
+        self.assertEqual(policy({'action_id':'new'}),{'action_id':'new'})
+
 
 class OwnedProcessTests(unittest.TestCase):
     def test_collects_own_exit_and_resource_usage(self):

@@ -74,11 +74,25 @@ def run_batch(specs,output,choose,*,fault_hook=None):
 
 class JsonLinePolicy:
     def __init__(self,command,output,timeout=30):
-        self.stderr=Path(output).open('x');self.timeout=timeout
-        self.process=subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=self.stderr,bufsize=0)
+        self.stderr=Path(output).open('x');self.timeout=timeout;self.command=command;self.process=None
+        try:self._start()
+        except BaseException:self.stderr.close();raise
+
+    def _start(self):
+        if self.stderr.closed:raise PolicyFault('policy_closed')
+        self.process=subprocess.Popen(self.command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=self.stderr,bufsize=0)
         os.set_blocking(self.process.stdin.fileno(),False)
         os.set_blocking(self.process.stdout.fileno(),False)
+
     def __call__(self,boundary,*,run_deadline=None):
+        if self.process is None:self._start()
+        try:return self._exchange(boundary,run_deadline)
+        except BaseException:
+            # 遅延応答を次ランで受け取らないよう、失敗した通信路は破棄する。
+            self._stop()
+            raise
+
+    def _exchange(self,boundary,run_deadline):
         deadline=time.monotonic()+self.timeout
         if run_deadline is not None:deadline=min(deadline,run_deadline)
         payload=memoryview((json.dumps(boundary,ensure_ascii=False)+'\n').encode())
@@ -113,12 +127,16 @@ class JsonLinePolicy:
         if not isinstance(decision,dict) or not isinstance(decision.get('action_id'),str):
             raise PolicyFault('policy_response_missing_action_id')
         return decision
-    def close(self):
+    def _stop(self):
+        if self.process is None:return
         if self.process.poll() is None:
             self.process.terminate()
             try:self.process.wait(timeout=3)
             except subprocess.TimeoutExpired:self.process.kill();self.process.wait(timeout=3)
-        self.process.stdin.close();self.process.stdout.close();self.stderr.close()
+        self.process.stdin.close();self.process.stdout.close();self.process=None
+
+    def close(self):
+        self._stop();self.stderr.close()
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--plan',type=Path,required=True);parser.add_argument('--output',type=Path,required=True)

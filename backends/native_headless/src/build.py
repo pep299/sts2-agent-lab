@@ -8,13 +8,14 @@ import subprocess
 import tempfile
 
 from configuration import BACKEND, LOCAL, BUILD, LOCK, MANIFEST, load_config, dotnet_command
-from runtime import sha, write_json
+from runtime import sha, write_json, validate_mods
 
 def build():
     load_config()
     lock = LOCK.open('a+')
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     manifest = json.loads(MANIFEST.read_text())
+    validate_mods(manifest['executable'])
     BUILD.mkdir(parents=True, exist_ok=True)
     environment = os.environ | {'DOTNET_CLI_HOME':str(LOCAL / 'dotnet-home'), 'DOTNET_CLI_TELEMETRY_OPTOUT':'1',
                                'DOTNET_GENERATE_ASPNET_CERTIFICATE':'false'}
