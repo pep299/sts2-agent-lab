@@ -1,0 +1,39 @@
+use sts2_content::cards::spec_index::card_rarity_rank_csharp_in;
+use sts2_core::cards::{try_add_to_hand, PileKind};
+use sts2_core::{ChoiceKind, ChoiceOption, CombatState, CreatureUid, EffectResult};
+
+pub(crate) fn play(state: &mut CombatState, _target: Option<CreatureUid>) -> EffectResult {
+    let mut candidates = state.player.draw.clone();
+    candidates.sort_by(|a, b| {
+        let ca = &state.cards[a.0.get() as usize - 1];
+        let cb = &state.cards[b.0.get() as usize - 1];
+        card_rarity_rank_csharp_in(ca.card_id, state.game_version)
+            .cmp(&card_rarity_rank_csharp_in(cb.card_id, state.game_version))
+            .then_with(|| ca.card_id.to_python_name().cmp(cb.card_id.to_python_name()))
+    });
+    match candidates.as_slice() {
+        [] => {}
+        [uid] => {
+            if let Some(pos) = state.player.draw.iter().position(|u| u == uid) {
+                let card = state.player.draw.remove(pos);
+                let _ = try_add_to_hand(&mut state.player, card);
+            }
+        }
+        _ => {
+            let options = candidates
+                .iter()
+                .map(|uid| {
+                    let card = &state.cards[uid.0.get() as usize - 1];
+                    ChoiceOption {
+                        card_id: card.card_id,
+                        upgraded: card.upgraded,
+                        card_uid: Some(*uid),
+                        source_pile: Some(PileKind::Draw),
+                    }
+                })
+                .collect();
+            state.request_card_choice(ChoiceKind::AddFromDrawToHand, options, 1, 1, false);
+        }
+    }
+    EffectResult::Resolved
+}

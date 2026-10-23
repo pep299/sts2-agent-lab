@@ -1,0 +1,95 @@
+diff --git a/sts2-rs/crates/sts2-content/tests/gh500_nested_select_play_tail.rs b/sts2-rs/crates/sts2-content/tests/gh500_nested_select_play_tail.rs
+index 77f71ea..fc2cf2b 100644
+--- a/sts2-rs/crates/sts2-content/tests/gh500_nested_select_play_tail.rs
++++ b/sts2-rs/crates/sts2-content/tests/gh500_nested_select_play_tail.rs
+@@ -44,9 +44,8 @@ fn push_card(state: &mut CombatState, id: CardId, card_type: CardType) -> sts2_c
+ /// CATASTROPHE auto-plays two ARMAMENTS off the draw pile. The first one's
+ /// upgrade select SURFACES (3 upgradable hand cards) and parks both the
+ /// auto-play tail and CATASTROPHE's own play tail; resolving it resumes the
+-/// loop, whose second ARMAMENTS opens another upgrade select that is drained
+-/// INLINE. CATASTROPHE must still be the LAST of the three cards to reach the
+-/// discard pile.
++/// ループの再開後、2枚目のARMAMENTSも選択を公開する。
++/// 両方の選択を終えるまでCATASTROPHEを廃棄しない。
+ #[test]
+ fn catastrophe_discards_after_the_auto_plays_it_is_still_awaiting() {
+     content_dispatch::ensure_installed();
+@@ -100,9 +99,14 @@ fn catastrophe_discards_after_the_auto_plays_it_is_still_awaiting() {
+     let selection: smallvec::SmallVec<[u8; 4]> = [0u8].into_iter().collect();
+     let _ = sts2_core::apply(&mut state, Action::ResolveChoice { selection });
+
++    assert!(state.pending_choice.is_some());
++    assert!(state.pending_play.is_some());
++    assert!(!state.player.discard.contains(&catastrophe));
++    let selection: smallvec::SmallVec<[u8; 4]> = [0u8].into_iter().collect();
++    let _ = sts2_core::apply(&mut state, Action::ResolveChoice { selection });
+     assert!(
+         state.pending_choice.is_none(),
+-        "the second ARMAMENTS' select is drained inline during the resume"
++        "両方のARMAMENTSの選択が完了した"
+     );
+     assert!(
+         state.pending_play.is_none(),
+diff --git a/sts2-rs/crates/sts2-core/src/lib.rs b/sts2-rs/crates/sts2-core/src/lib.rs
+index d2d2a17..5f5ab70 100644
+--- a/sts2-rs/crates/sts2-core/src/lib.rs
++++ b/sts2-rs/crates/sts2-core/src/lib.rs
+@@ -9343,23 +9343,16 @@ fn resolve_choice_atomic(
+     // tail (`AfterCardPlayed` buses, replay loop, Play→Discard/Exhaust
+     // disposal) and then play any remaining collected cards — exactly the order
+     // C#'s `OnPlayWrapper` produces by awaiting the selector inside `OnPlay`
+-    // (`CardModel.cs:1498`), then continuing the auto-play loop. `autoplay_inline_resolve`
+-    // is raised for the whole resume so any FURTHER nested choice (a chained
+-    // auto-play's follow-on screen) drains inline at the option-0 prefix —
+-    // mirroring the headless `AutoResolveInline` set during `DoSelectCards`
+-    // (`RunSimulator.cs:2165`), which preserves the `y1fic` chained-auto-play
+-    // deadlock fix. Ordered BEFORE the generic `pending_play` block.
++    // (`CardModel.cs:1498`), then continuing the auto-play loop.
++    // 使用後処理・回収済み兄弟・親フレームはinlineで再開する。
++    // 最外周ループの継続では設定を戻し、次の公開選択で再び保留する。
++    // Ordered BEFORE the generic `pending_play` block.
+     //
+     // The two CAN both be set at once: a HAND-played auto-play card (e.g. Havoc
+     // via `play_card`) whose nested auto-play surfaced sets BOTH
+     // `pending_autoplay_resume` (the nested Armaments tail) AND `pending_play`
+-    // (Havoc's own tail, parked by `play_card`). C# resumes the whole stack in
+-    // one `DoSelectCards` call with `AutoResolveInline` held true throughout —
+-    // the nested auto-play finishes, then the parent play's tail runs, all
+-    // inline. We mirror that: finish the auto-play resume, then (still under the
+-    // raised flag) finish the parent `pending_play` if present, then restore the
+-    // flag. Only when the surfaced pick didn't re-open a nested choice (a
+-    // chained select keeps the resume parked and re-surfaces).
++    // (Havoc's own tail, parked by `play_card`). 親のpending_playは残りループが
++    // 完了するまで保持する。次の選択が開いた場合は、その回答後に再開する。
+     if state.pending_choice.is_none() {
+         if let Some(resume) = state.pending_autoplay_resume.take() {
+             let crate::PendingAutoplayResume {
+@@ -9415,24 +9408,19 @@ fn resolve_choice_atomic(
+                     crate::combat_loop::resolve_auto_played_card(state, uid, frame.force_exhaust);
+                 }
+             }
++            // 実ゲームは再開したループの次の選択も公開する。カードの使用後
++            // 処理が終わったらinline設定を戻し、ループの継続を再び保留可能にする。
++            state.autoplay_inline_resolve = prev_inline;
+             // Re-selection auto-play-loop continuation (Catastrophe / BeatDown):
+             // now that the surfaced card's tail has run (the fetched / relocated
+             // card has left the pile), replay the loop's not-yet-run iterations
+             // against the UPDATED pile — mirroring C# `await CardCmd.AutoPlay`
+-            // resuming the `OnPlay` loop. Still under the raised inline flag, so
+-            // any further nested select in those iterations drains inline rather
+-            // than re-surfacing (the loop runs to completion here). Bead
+-            // `sts2-rs-cata-suspend`.
++            // resuming the `OnPlay` loop.
+             if let Some(cont) = continuation {
+                 if !state.is_over {
+                     (cont.resume_fn)(state, cont.iters, &cont.uids, cont.force_exhaust);
+                 }
+             }
+-            // Restore inline-resolve BEFORE the draw continuation below so a
+-            // further on-draw auto-play in the continued draw surfaces its own
+-            // select (rather than draining inline). The parent hand-play tail
+-            // (if any) likewise finishes under the restored flag, matching C#.
+-            state.autoplay_inline_resolve = prev_inline;
+             // Bead `sts2-rs-hellraiser-draw-suspend` (DRAW_ORDER / PILE_COUNT
+             // seeds 1586/3453/4081/5754): the auto-play just finished
+             // was an on-draw HellraiserPower play whose surfaced select had

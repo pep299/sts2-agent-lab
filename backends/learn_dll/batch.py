@@ -7,13 +7,13 @@ import subprocess
 import time
 import traceback
 
-from backends.common.policy_io import JsonLinePolicy, DeclaredLimit
+from backends.common.policy_io import JsonLinePolicy, DeclaredLimit, PolicyFault
 from backends.learn_dll.learn_environment import LearnEnvironment
 
 REPO = Path(__file__).resolve().parents[2]
 
 
-def run_episode(root, dotnet, output, seed, policy_command, *, seconds=900, max_steps=5000, policy_cwd=None):
+def run_episode(root, dotnet, output, seed, policy_command, *, seconds=900, max_steps=5000, policy_cwd=REPO):
     if min(seconds, max_steps) <= 0:
         raise ValueError('時間・操作上限は正の整数を指定')
     root = Path(root).resolve()
@@ -69,6 +69,8 @@ def run_episode(root, dotnet, output, seed, policy_command, *, seconds=900, max_
     except DeclaredLimit as error:
         report.update(outcome='interrupted', interruptionReason=str(error))
         report.pop('faultOwner', None)
+    except PolicyFault as error:
+        report.update(outcome='fault', faultOwner='policy', error=str(error), traceback=traceback.format_exc())
     except TimeoutError as error:
         if time.monotonic() >= deadline:
             report.update(outcome='interrupted', interruptionReason='declared_wall_time_limit')
@@ -111,12 +113,14 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--seconds', type=int, default=900)
     parser.add_argument('--max-steps', type=int, default=5000)
+    parser.add_argument('--policy-cwd', type=Path, default=REPO,
+                        help='方策プロセスの作業ディレクトリ。既定はこのリポジトリ')
     parser.add_argument('--policy-command', nargs=argparse.REMAINDER, required=True)
     args = parser.parse_args()
     if not args.policy_command:
         parser.error('--policy-command以降に方策のコマンドを指定')
     report = run_episode(args.learn_root, args.dotnet, args.output, args.seed, args.policy_command,
-                         seconds=args.seconds, max_steps=args.max_steps)
+                         seconds=args.seconds, max_steps=args.max_steps, policy_cwd=args.policy_cwd)
     print(json.dumps(report, ensure_ascii=False))
     raise SystemExit(1 if report['outcome'] == 'fault' else 0)
 

@@ -8,6 +8,7 @@ import subprocess
 import time
 
 from backends.learn_dll.observation import normalize_observation
+from backends.common.policy_io import PolicyFault
 
 
 class LearnEnvironment:
@@ -68,18 +69,22 @@ class LearnEnvironment:
                              'actGeneration': 'seeded_all_unlocked'}, deadline)
 
     def step(self, decision, deadline=None):
+        if not any(a['id'] == decision['action_id'] for a in self.last['observation']['actions']):
+            raise PolicyFault('行動IDが公開候補にない')
         actions = self.actions
-        if decision['action_id'] == 'choose_cards:' and 'indices' in decision:
+        if decision['action_id'] == 'choose_cards:':
             if not any(a['detail'].get('parameter') == 'cardIndices' for a in actions):
-                raise ValueError('カード番号を受け付ける候補がない')
-            indices = decision['indices']
+                raise PolicyFault('カード番号を受け付ける候補がない')
+            indices = decision.get('indices')
             selection = self.last['observation']['state']['selection']
             if (not isinstance(indices, list) or any(type(i) is not int or not 0 <= i < len(selection['cards']) for i in indices)
                     or len(set(indices)) != len(indices) or not selection['min'] <= len(indices) <= selection['max']):
-                raise ValueError('カード番号または選択枚数が公開候補の制約外')
+                raise PolicyFault('カード番号または選択枚数が公開候補の制約外')
             command = {'cmd': 'step', 'cardIndices': indices}
         else:
-            action = next(a for a in actions if a['id'] == decision['action_id'])
+            action = next((a for a in actions if a['id'] == decision['action_id']), None)
+            if action is None:
+                raise PolicyFault('行動IDが公開候補にない')
             command = {'cmd': 'step', 'index': action['detail']['nativeOptionIndex']}
         result = self.request(command, deadline)
         self.steps += 1

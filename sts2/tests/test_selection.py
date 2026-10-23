@@ -4,7 +4,6 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from sts2.observation import Unsupported
 from sts2.selection import SelectionContext
 
 
@@ -39,8 +38,7 @@ class SelectionKnowledge(unittest.TestCase):
         self.assertEqual(SelectionContext().prepare(before)['state']['selection']['purpose'], 'remove')
 
     def test_unknown_effect_does_not_guess_from_cards(self):
-        with self.assertRaises(Unsupported):
-            SelectionContext().prepare(selection())
+        self.assertIsNone(SelectionContext().prepare(selection())['state']['selection']['purpose'])
 
     def test_combat_selection_is_identified_without_guessing_effect(self):
         self.assertEqual(SelectionContext().prepare(selection({'turn': 2}))['state']['selection']['purpose'], 'combat_choice')
@@ -52,5 +50,4 @@ class SelectionKnowledge(unittest.TestCase):
             {'action_id': 'rest:smith'})
         self.assertEqual(context.prepare(selection())['state']['selection']['purpose'], 'upgrade')
         context.reset()
-        with self.assertRaises(Unsupported):
-            context.prepare(selection())
+        self.assertIsNone(context.prepare(selection())['state']['selection']['purpose'])

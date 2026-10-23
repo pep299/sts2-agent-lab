@@ -4,9 +4,9 @@ import json
 import sys
 import time
 
-from agents.mentor.combat import make_wire, match_action, resolve
-from agents.mentor.nested_combat import resume_choice, search_indices
-from agents.mentor.noncombat import NoncombatPolicy, card, strategic_actions
+from agents.mentor.combat import make_wire, match_action, resolve, wire_cards
+from agents.mentor.nested_combat import align_choice, resume_choice, search_indices
+from agents.mentor.noncombat import NoncombatPolicy, UnscoredSelection, card, strategic_actions
 from agents.mentor.runtime import MentorRuntime
 from sts2.observation import Unsupported, card_state, is_boss
 from sts2.selection import SelectionContext
@@ -15,6 +15,7 @@ from sts2.selection import SelectionContext
 class Mentor:
     def __init__(self, configuration):
         runtime = MentorRuntime(configuration)
+        self.identity = runtime.identity
         self.engine = runtime.engine
         self.search = runtime.search
         self.registries = runtime.registries
@@ -42,7 +43,6 @@ class Mentor:
         previous = self.previous_combat
         self.previous_combat = None
         actions = strategic_actions(observation)
-        self.noncombat.selection_fallback = self.selection_fallback
         if observation['state']['phase'] == 'grid_selection' and observation['state']['status']['combat'] is not None:
             if previous is None:
                 raise Unsupported('戦闘子選択に対応する直前の公開行動がない')
@@ -51,7 +51,8 @@ class Mentor:
             offered = [(resolve(card(c)['id'], self.registries['card'], ('_CARD', '_STATUS')),
                         bool(card(c)['upgrade_level'])) for c in selection['cards']]
             selection = dict(selection, max=min(selection['max'], len(offered)))
-            state = resume_choice(self.engine, previous[0], previous[1], current, offered)
+            history = previous[2] if len(previous) > 2 else []
+            state, replay_info = resume_choice(self.engine, previous[0], previous[1], current, offered, history)
             pending = state.pending_choice()
             derived = [(c['id'], c['upgraded']) for c in pending['cards']]
             generative = self.engine.choice_kind_is_generative(pending['kind'])
@@ -63,6 +64,10 @@ class Mentor:
                     minimum, selection['max'], pending['can_skip'], True)
                 pending = state.pending_choice()
                 derived = [(c['id'], c['upgraded']) for c in pending['cards']]
+            else:
+                align_choice(self.engine, state, current, wire_cards(selection['cards'], self.registries))
+                pending = state.pending_choice()
+                derived = [(c['id'], c['upgraded']) for c in pending['cards']]
             arity_matches = (selection['min'], selection['max']) == (pending['min_select'], pending['max_select'])
             curse_subset = pending['kind'] == 'monster_curse_select' and selection['min'] == 0 and selection['max'] == 1 and pending['min_select'] == pending['max_select'] == 1
             if offered != derived or not (arity_matches or curse_subset):
@@ -70,9 +75,12 @@ class Mentor:
             sims = self.search['boss_sims' if is_boss(observation) else 'sims']
             indices, searches = search_indices(self.engine, state, selection['min'], selection['max'],
                                                len(offered), sims=sims, threads=self.search['threads'])
+            self.previous_combat = previous[0], previous[1], history + [
+                {'current': current, 'cards': wire_cards(selection['cards'], self.registries), 'indices': indices}]
             response, info = {'action_id': 'choose_cards:', 'indices': indices}, {
                     'source': 'mcts_verified_replay_choice', 'kind': pending['kind'],
                     'sims': sims, 'search_actions': searches, 'search_calls': len(searches),
+                    'replay': replay_info,
                     'world_generated_options': generative, 'hidden_info': 'beliefdraw',
                     'choice_constraint': 'choose_one_curse_even_when_selector_allows_empty' if curse_subset else None}
         elif len(actions) == 1 and actions[0]['id'] != 'choose_cards:':
@@ -120,7 +128,8 @@ class Mentor:
         observation = boundary['observation']
         state = observation['state']
         selection = state.get('selection')
-        if not self.selection_fallback or state['phase'] != 'grid_selection' or selection is None:
+        if (not self.selection_fallback or not isinstance(error, UnscoredSelection)
+                or state['phase'] != 'grid_selection' or selection is None):
             raise error
         if not any(a['id'] == 'choose_cards:'
                    for a in observation['actions']):

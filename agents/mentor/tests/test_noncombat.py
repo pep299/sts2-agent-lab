@@ -6,6 +6,7 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from agents.mentor.noncombat import NoncombatPolicy
 from agents.mentor.runtime import MentorRuntime, default_config
+from sts2.observation import Unsupported
 
 
 def observation(phase):
@@ -47,3 +48,31 @@ class NoncombatInterface(unittest.TestCase):
         response, info = NoncombatPolicy(self.runtime).choose(obs)
         self.assertEqual(response, {'action_id': 'gold'})
         self.assertEqual(info['source'], 'fixed_reward_collection')
+
+    def test_rest_slot_means_heal_or_smith_independent_of_public_order(self):
+        class PreferSmith:
+            def distribution(self, obs, actions, features):
+                weights = [1.0 if a['idx'] == 1 else 0.0 for a in actions]
+                return weights, 0.0
+
+        for labels in (['SMITH', 'HEAL'], ['EXTRA', 'SMITH'], ['HEAL', 'SMITH', 'EXTRA']):
+            with self.subTest(labels=labels):
+                obs = observation('rest')
+                obs['actions'] = [{'id': f'rest:{key}', 'kind': 'rest',
+                    'detail': {'metadata': {'option_key': key}}} for key in labels]
+                policy = NoncombatPolicy(self.runtime)
+                policy.net = PreferSmith()
+                response, info = policy.choose(obs)
+                self.assertEqual(response, {'action_id': 'rest:SMITH'})
+                supported = [key for key in labels if key in {'HEAL', 'SMITH'}]
+                self.assertEqual([a['idx'] for a in info['actions']],
+                                 [{'HEAL': 0, 'SMITH': 1}[key] for key in supported])
+                self.assertEqual(info['fixed_excluded_rest_options'],
+                                 [key for key in labels if key == 'EXTRA'])
+
+    def test_no_scorable_rest_candidate_stops(self):
+        obs = observation('rest')
+        obs['actions'] = [{'id': f'rest:{i}', 'kind': 'rest',
+            'detail': {'metadata': {'option_key': f'EXTRA{i}'}}} for i in range(2)]
+        with self.assertRaisesRegex(Unsupported, '休憩候補がない'):
+            NoncombatPolicy(self.runtime).choose(obs)

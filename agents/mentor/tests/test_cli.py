@@ -25,6 +25,24 @@ class PolicyCliContract(unittest.TestCase):
             self.assertEqual(info['build_git'], config['identity']['build_git'])
             self.assertEqual(info['search'], config['search'] | {'sims': 7})
             self.assertIn('sts2/selection.py', info['source_sha256'])
+            self.assertEqual(info['model_sha256'], config['identity']['model_sha256'])
+            self.assertEqual(len(info['extension_sha256']), 64)
+
+    def test_existing_artifacts_can_report_identity_without_expected_pins(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = tomllib.loads(CONFIG.read_text())
+            contents = CONFIG.read_text()
+            for key, value in config['identity'].items():
+                contents = contents.replace(f'{key} = "{value}"', '')
+            unpinned = Path(directory) / 'existing-artifacts.toml'
+            unpinned.write_text(contents)
+            result = subprocess.run([sys.executable, '-B', '-m', 'agents.mentor',
+                                     '--config', str(unpinned)], input='', capture_output=True,
+                                    text=True, cwd=REPO, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            info = json.loads(result.stderr)
+            self.assertEqual(info['model_sha256'], config['identity']['model_sha256'])
+            self.assertEqual(info['build_git'], config['identity']['build_git'])
 
     def test_wrong_model_identity_fails_before_accepting_input(self):
         with tempfile.TemporaryDirectory() as directory:

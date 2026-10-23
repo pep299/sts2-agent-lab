@@ -7,7 +7,7 @@ from io import StringIO
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from agents.mentor.combat import Unsupported
 from agents.mentor.policy import Mentor
-from agents.mentor.noncombat import reward_claims
+from agents.mentor.noncombat import UnscoredSelection, reward_claims
 
 
 def base():
@@ -25,12 +25,17 @@ class PolicyContract(unittest.TestCase):
         obs['actions'] = [{'id': 'choose_cards:', 'detail': {'parameter': 'cardIndices'}}]
         boundary = {'decision_id': 9, 'observation': obs}
         with self.assertRaises(Unsupported):
-            policy.fallback_selection(boundary, Unsupported('unknown purpose'))
+            policy.fallback_selection(boundary, UnscoredSelection('unknown purpose'))
         policy.selection_fallback = True
         with redirect_stderr(StringIO()):
-            self.assertEqual(policy.fallback_selection(boundary, Unsupported('unknown purpose'))['indices'], [0, 1])
+            self.assertEqual(policy.fallback_selection(boundary, UnscoredSelection('unknown purpose'))['indices'], [0, 1])
             obs['state']['selection']['min'] = 0
-            self.assertEqual(policy.fallback_selection(boundary, Unsupported('unknown purpose'))['indices'], [])
+            self.assertEqual(policy.fallback_selection(boundary, UnscoredSelection('unknown purpose'))['indices'], [])
+        for reason in ('version mismatch', 'replay mismatch', 'unknown combat effect'):
+            error = Unsupported(reason)
+            with self.assertRaises(Unsupported) as caught:
+                policy.fallback_selection(boundary, error)
+            self.assertIs(caught.exception, error)
         obs['state']['phase'] = 'combat'
         with self.assertRaises(Unsupported):
             policy.fallback_selection(boundary, Unsupported('missing combat effect'))

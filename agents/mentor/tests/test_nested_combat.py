@@ -6,7 +6,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from agents.mentor.combat import AFFLICTIONS, Unsupported, infer_enemy_moves
-from agents.mentor.nested_combat import public_projection, resume_choice, search_indices
+from agents.mentor.nested_combat import align_choice, public_projection, resume_choice, search_indices
 from agents.mentor.policy import Mentor
 from agents.mentor.runtime import default_config
 
@@ -43,9 +43,157 @@ class ReplayContract(unittest.TestCase):
     def test_already_visible_draw_is_replayed_without_next_draw_knowledge(self):
         before, current = self.prepared_outcome()
         saved = deepcopy(before)
-        state = resume_choice(self.engine, before, {'action': 'play', 'card_index': 1}, current)
+        state, info = resume_choice(self.engine, before, {'action': 'play', 'card_index': 1}, current)
         self.assertEqual([c['id'] for c in state.pending_choice()['cards']], ['ANGER', 'STRIKE_IRONCLAD'])
         self.assertEqual(before, saved)
+
+    def test_wish_waits_for_a_choice_and_preserves_card_disposal(self):
+        source = wire()
+        source['deck']['hand'] = [{'id': 'WISH', 'stable_idx': 0, 'kind': 'card', 'upgraded': False}]
+        source['deck']['draw_pile'] = [
+            {'id': name, 'stable_idx': i, 'kind': 'card', 'upgraded': False}
+            for i, name in enumerate(['DEMON_FORM', 'STRIKE_IRONCLAD', 'ANGER'])]
+        for index, expected in enumerate(['STRIKE_IRONCLAD', 'ANGER', 'DEMON_FORM_CARD']):
+            with self.subTest(index=index):
+                state = self.engine.state_from_dict(source)
+                self.assertEqual(state.apply_step({'action': 'play', 'card_index': 0}), 'pending_choice')
+                self.assertTrue(state.has_pending_play())
+                self.assertEqual([c['id'] for c in state.pending_choice()['cards']],
+                                 ['STRIKE_IRONCLAD', 'ANGER', 'DEMON_FORM_CARD'])
+                state.apply({'action': 'choose', 'index': index, 'selection': [index]})
+                result = self.engine.state_to_dict(state)['deck']
+                self.assertEqual([c['id'] for c in result['hand']], [expected])
+                self.assertEqual([c['id'] for c in result['exhaust_pile']], ['WISH'])
+                self.assertFalse(state.has_pending_play())
+
+    def test_wish_zero_or_one_candidate_does_not_open_a_choice(self):
+        for count in (0, 1):
+            with self.subTest(count=count):
+                source = wire()
+                source['deck']['hand'] = [{'id': 'WISH', 'stable_idx': 0, 'kind': 'card', 'upgraded': False}]
+                source['deck']['draw_pile'] = [
+                    {'id': 'BASH', 'stable_idx': 0, 'kind': 'card', 'upgraded': False}] if count else []
+                state = self.engine.state_from_dict(source)
+                state.apply({'action': 'play', 'card_index': 0})
+                self.assertIsNone(state.pending_choice())
+                result = self.engine.state_to_dict(state)['deck']
+                self.assertEqual(sum(c['id'] == 'BASH' for c in result['hand']), count)
+
+    def test_wish_override_survives_state_reconstruction_and_search(self):
+        source = wire()
+        source['deck']['hand'] = [{'id': 'WISH', 'stable_idx': 0, 'kind': 'card', 'upgraded': False}]
+        state = self.engine.state_from_dict(source)
+        self.engine.state_from_dict(wire())
+        self.engine.mcts_recommend(state, sims=16, threads=1, hidden_info='beliefdraw', seed=0)
+        state.apply({'action': 'play', 'card_index': 0})
+        self.assertEqual(state.pending_choice()['kind'], 'add_from_draw_to_hand')
+
+    def test_failed_state_reconstruction_does_not_reset_existing_state_rules(self):
+        source = wire()
+        source['deck']['hand'] = [{'id': 'WISH', 'stable_idx': 0, 'kind': 'card', 'upgraded': False}]
+        state = self.engine.state_from_dict(source)
+        invalid = wire()
+        invalid['rng'].update(run_seed=0, counters={'not_a_stream': 0})
+        with self.assertRaisesRegex(ValueError, 'not a stream'):
+            self.engine.state_from_dict(invalid)
+        state.apply({'action': 'play', 'card_index': 0})
+        self.assertEqual(state.pending_choice()['kind'], 'add_from_draw_to_hand')
+
+    def test_same_name_choices_keep_enchantment_and_world_order(self):
+        source = wire()
+        source['deck']['hand'] = [{'id': 'WISH', 'stable_idx': 0, 'kind': 'card', 'upgraded': False}]
+        source['deck']['draw_pile'] = [
+            {'id': 'DEFEND_IRONCLAD', 'stable_idx': 0, 'kind': 'card', 'upgraded': False,
+             'enchantment': 'NIMBLE', 'enchantment_amount': 2},
+            {'id': 'DEFEND_IRONCLAD', 'stable_idx': 1, 'kind': 'card', 'upgraded': False}]
+        state = self.engine.state_from_dict(source)
+        state.apply({'action': 'play', 'card_index': 0})
+        current = self.engine.state_to_dict(state)
+        offered = list(reversed(current['deck']['draw_pile']))
+        align_choice(self.engine, state, current, offered)
+        self.assertEqual([c['index'] for c in state.pending_choice()['cards']], [1, 0])
+        state.apply({'action': 'choose', 'index': 0, 'selection': [0]})
+        hand = self.engine.state_to_dict(state)['deck']['hand']
+        self.assertEqual(len(hand), 1)
+        self.assertIsNone(hand[0].get('enchantment'))
+
+        state = self.engine.state_from_dict(source)
+        state.apply({'action': 'play', 'card_index': 0})
+        offered[1]['enchantment_amount'] = 99
+        with self.assertRaisesRegex(Unsupported, '属性が再生中'):
+            align_choice(self.engine, state, current, offered)
+
+    def test_catastrophe_reconstructs_only_an_already_visible_random_outcome(self):
+        source = wire()
+        source['deck']['hand'] = [{'id': 'CATASTROPHE', 'stable_idx': 0, 'kind': 'card', 'upgraded': False}]
+        source['deck']['draw_pile'] = [
+            {'id': name, 'stable_idx': i, 'kind': 'card', 'upgraded': False}
+            for i, name in enumerate(['WISH', 'STRIKE_IRONCLAD', 'ANGER', 'BASH', 'DEFEND_IRONCLAD'])]
+        action = {'action': 'play', 'card_index': 0}
+        original = deepcopy(source)
+        default = self.engine.state_from_dict(source)
+        default.apply(action)
+        default_result = public_projection(self.engine.state_to_dict(default))
+        for seed in range(100):
+            actual = deepcopy(source)
+            actual['rng']['run_seed'] = seed
+            state = self.engine.state_from_dict(actual)
+            state.apply(action)
+            choice = state.pending_choice()
+            if (choice and self.engine.state_to_dict(state)['deck']['play_pile'][-1]['id'] == 'WISH'
+                    and public_projection(self.engine.state_to_dict(state)) != default_result):
+                current = self.engine.state_to_dict(state)
+                offered = [(c['id'], c['upgraded']) for c in choice['cards']]
+                replay, info = resume_choice(self.engine, source, action, current, offered)
+                self.assertEqual(public_projection(self.engine.state_to_dict(replay)), public_projection(current))
+                self.assertEqual(info['method'], 'observed_random_outcome')
+                self.assertEqual(source, original)
+                replay.apply({'action': 'choose', 'index': 0, 'selection': [0]})
+                self.assertFalse(replay.has_pending_play())
+                self.assertFalse(replay.has_suspended_walk())
+                self.assertIsNone(replay.pending_choice())
+                current['player']['hp'] -= 1
+                with self.assertRaisesRegex(Unsupported, '4096試行'):
+                    resume_choice(self.engine, source, action, current, offered)
+                return
+        self.fail('Wish自動使用の試験局面を構成できない')
+
+    def test_catastrophe_surfaces_and_replays_the_second_wish_choice(self):
+        source = wire()
+        source['deck']['hand'] = [{'id': 'CATASTROPHE', 'stable_idx': 0, 'kind': 'card', 'upgraded': False}]
+        source['deck']['draw_pile'] = [
+            {'id': name, 'stable_idx': i, 'kind': 'card', 'upgraded': False}
+            for i, name in enumerate(['WISH', 'WISH', 'STRIKE_IRONCLAD', 'ANGER', 'BASH', 'DEFEND_IRONCLAD'])]
+        action = {'action': 'play', 'card_index': 0}
+        for seed in range(100):
+            actual = deepcopy(source)
+            actual['rng']['run_seed'] = seed
+            state = self.engine.state_from_dict(actual)
+            state.apply(action)
+            first = state.pending_choice()
+            if first is None:
+                continue
+            current = self.engine.state_to_dict(state)
+            pick = next((i for i, c in enumerate(first['cards']) if c['id'] == 'STRIKE_IRONCLAD'), None)
+            if pick is None:
+                continue
+            cards = [current['deck']['draw_pile'][c['index']] for c in first['cards']]
+            state.apply({'action': 'choose', 'selection': [pick]})
+            second = state.pending_choice()
+            if second is None:
+                continue
+            next_current = self.engine.state_to_dict(state)
+            offered = [(c['id'], c['upgraded']) for c in second['cards']]
+            history = [{'current': current, 'cards': cards, 'indices': [pick]}]
+            replay, info = resume_choice(self.engine, source, action, next_current, offered, history)
+            self.assertEqual(info['earlier_choices'], 1)
+            self.assertEqual(public_projection(self.engine.state_to_dict(replay)), public_projection(next_current))
+            self.assertTrue(replay.has_pending_play())
+            replay.apply({'action': 'choose', 'selection': [0]})
+            self.assertIsNone(replay.pending_choice())
+            self.assertFalse(replay.has_pending_play())
+            return
+        self.fail('2回目のWish選択が公開されない')
 
     def test_board_disagreement_rejects_child_search(self):
         before, current = self.prepared_outcome()
@@ -67,7 +215,7 @@ class ReplayContract(unittest.TestCase):
         state.apply(action)
         current = self.engine.state_to_dict(state)
         current['encounter'] = [e for e in current['encounter'] if e['hp'] > 0]
-        self.assertIsNotNone(resume_choice(self.engine, before, action, current).pending_choice())
+        self.assertIsNotNone(resume_choice(self.engine, before, action, current)[0].pending_choice())
         current['encounter'][0]['hp'] -= 1
         with self.assertRaisesRegex(Unsupported, 'encounter'):
             resume_choice(self.engine, before, action, current)

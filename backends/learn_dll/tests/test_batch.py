@@ -49,3 +49,14 @@ class BackendBatchContract(unittest.TestCase):
     def test_step_budget_is_interruption_instead_of_failure(self):
         report = self.run_policy([sys.executable, '-u', '-c', POLICY], 'EXAMPLE', max_steps=1)
         self.assertEqual((report['outcome'], report['terminal'], report['dataValid']), ('interrupted', None, False))
+
+    def test_illegal_candidate_is_a_policy_fault_instead_of_environment_fault(self):
+        invalid = POLICY.replace("'indices':[0]", "'indices':[3]")
+        report = self.run_policy([sys.executable, '-u', '-c', invalid], 'EXAMPLE')
+        self.assertEqual((report['outcome'], report['terminal'], report['dataValid'], report['faultOwner']),
+                         ('fault', None, False, 'policy'))
+
+    def test_default_policy_cwd_is_the_repository(self):
+        command = f'import os; assert os.getcwd() == {str(REPO)!r}\n' + POLICY
+        report = self.run_policy([sys.executable, '-u', '-c', command], 'COMPLETE')
+        self.assertEqual(report['terminal'], 'victory')

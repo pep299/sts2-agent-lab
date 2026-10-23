@@ -11,6 +11,10 @@ class DeclaredLimit(EnvironmentFault):pass
 class PolicyFault(RuntimeError):pass
 
 class JsonLinePolicy:
+    """方策は1要求にJSON行を1応答し、診断をstderrへ出す。
+
+    追加stdoutは禁止。要求IDを照合しないため、遅れて届く余分な応答は識別できない。
+    """
     def __init__(self,command,output,timeout=30,*,cwd=None):
         self.stderr=Path(output).open('x');self.timeout=timeout;self.command=command;self.process=None;self.cwd=cwd
         try:self._start()

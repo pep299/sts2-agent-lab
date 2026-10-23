@@ -1,6 +1,10 @@
 name: Mentor
 
-on: [push, pull_request]
+on: push
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -10,11 +14,20 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      RUSTUP_TOOLCHAIN: '1.96.0'
       MENTOR_CONFIG: config/mentor.example.toml
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - run: make mentor-deps
+      - run: make mentor-deps mentor-patch
+      - name: Read Rust version from upstream declaration
+        run: |
+          python3 - <<'PYTHON'
+          import os
+          import tomllib
+          from pathlib import Path
+          version = tomllib.loads(Path("external/spire-mentor/sts2-rs/rust-toolchain.toml").read_text())["toolchain"]["channel"]
+          with open(os.environ["GITHUB_ENV"], "a") as output:
+              output.write(f"RUSTUP_TOOLCHAIN={version}\n")
+          PYTHON
       - run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
       - run: make mentor-build
       - run: make mentor-test

@@ -6,6 +6,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from backends.learn_dll.learn_environment import LearnEnvironment
+from backends.common.policy_io import PolicyFault
 
 HOST = '''import json
 import sys
@@ -62,8 +63,23 @@ class LearnEnvironmentContract(unittest.TestCase):
     def test_invalid_selection_never_reaches_host(self):
         self.env.reset('EXAMPLE')
         for indices in [[], [0, 0], [3], [-1], [True], [0, 1, 2]]:
-            with self.subTest(indices=indices), self.assertRaises(ValueError):
+            with self.subTest(indices=indices), self.assertRaises(PolicyFault):
                 self.env.step({'action_id': 'choose_cards:', 'indices': indices})
+        self.assertEqual((self.env.decision_id, self.env.steps), (1, 0))
+
+    def test_unknown_action_is_a_policy_fault_without_advancing_host(self):
+        self.env.reset('EXAMPLE')
+        with self.assertRaisesRegex(PolicyFault, '行動IDが公開候補にない'):
+            self.env.step({'action_id': 'not_a_candidate'})
+        self.assertEqual((self.env.decision_id, self.env.steps), (1, 0))
+
+    def test_hidden_native_selection_ids_never_reach_host(self):
+        self.env.reset('EXAMPLE')
+        for decision in ({'action_id': 'dll:select_cards'},
+                         {'action_id': 'dll:select_cards', 'indices': [0]},
+                         {'action_id': 'choose_cards:'}):
+            with self.subTest(decision=decision), self.assertRaises(PolicyFault):
+                self.env.step(decision)
         self.assertEqual((self.env.decision_id, self.env.steps), (1, 0))
 
     def test_host_fault_cannot_become_a_terminal_loss(self):
