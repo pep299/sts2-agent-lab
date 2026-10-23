@@ -218,4 +218,3 @@ class NoncombatPolicy:
             if self.card_reward_parent is not None:
                 self.declined_card_rewards.add(self.card_reward_parent)
         return response, info
-

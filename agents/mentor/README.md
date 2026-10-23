@@ -1,6 +1,6 @@
 # Mentor
 
-必要環境はPython 3.11以上、`external/spire-mentor/sts2-rs/rust-toolchain.toml`のRust/Cargo、C/C++ビルド環境。実行ファイルをPATHへ通すか、`MENTOR_PYTHON`・`MENTOR_CARGO`で指定する。
+必要環境はPython 3.11以上、`external/spire-mentor/sts2-rs/rust-toolchain.toml`のRust/Cargo、C/C++ビルド環境。実行ファイルをPATHへ通すか、`PYTHON`・`MENTOR_CARGO`で指定する。
 
 ```bash
 make mentor-deps mentor-build mentor-test

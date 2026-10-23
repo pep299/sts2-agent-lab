@@ -6,8 +6,8 @@ import sys
 import traceback
 from runtime import NativeEnvironment,EnvironmentFault,DeclaredLimit,Unsupported,RequestRejected,write_json,RESULTS
 
-sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'common'))
-from policy_io import JsonLinePolicy,PolicyFault
+sys.path.insert(0,str(Path(__file__).resolve().parents[3]))
+from backends.common.policy_io import JsonLinePolicy,PolicyFault
 
 def summarize(runs,requested):
     completed=[r for r in runs if r['outcome']=='completed' and r['dataValid']]

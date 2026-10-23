@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import sys
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / 'backends/native_headless/src'))
 from batch import JsonLinePolicy, run_batch
@@ -30,8 +30,8 @@ def main():
     if not output.is_relative_to(RESULTS) or output.exists():
         parser.error('出力はnative_headlessのresults内の新しいパスを指定')
     output.parent.mkdir(parents=True, exist_ok=True)
-    command = [sys.executable, '-B', '-m', 'agents.mentor.policy',
-               '--config', str(args.config)]
+    command = [sys.executable, '-B', '-m', 'agents.mentor',
+               '--config', str(args.config.resolve())]
     for flag, value in [('--sims', args.sims), ('--boss-sims', args.boss_sims)]:
         if value is not None:
             command += [flag, str(value)]
