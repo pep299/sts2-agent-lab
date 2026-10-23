@@ -4,7 +4,7 @@ set -euo pipefail
 bundle="$RUNNER_TEMP/sts2-chat"
 mkdir -p "$bundle/source" "$bundle/nuget" "$bundle/sim" dist
 
-git ls-files --recurse-submodules -z |
+git ls-files --recurse-submodules -z -- external/sts2-sim |
   tar --null -T - -cf - |
   tar -C "$bundle/source" -xf -
 
