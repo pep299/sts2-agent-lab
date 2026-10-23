@@ -9,25 +9,24 @@ chat-bundle:
 	dotnet build $(SIM) -c Release
 	bash scripts/package-chat.sh
 
-NATIVE_PYTHON ?= python3
+PYTHON ?= python3
 NATIVE_SRC := backends/native_headless/src
 NATIVE_OUTPUT ?= local/native_headless/results/verification-001
 
 .PHONY: native-prepare native-build native-test native-verify
 
 native-prepare:
-	$(NATIVE_PYTHON) $(NATIVE_SRC)/setup.py
+	$(PYTHON) $(NATIVE_SRC)/setup.py
 
 native-build:
-	$(NATIVE_PYTHON) $(NATIVE_SRC)/build.py
+	$(PYTHON) $(NATIVE_SRC)/build.py
 
 native-test:
-	PYTHONPATH=$(NATIVE_SRC) $(NATIVE_PYTHON) -m unittest discover -s backends/native_headless/tests
+	PYTHONPATH=$(NATIVE_SRC) $(PYTHON) -m unittest discover -s backends/native_headless/tests
 
 native-verify:
-	PYTHONPATH=$(NATIVE_SRC) $(NATIVE_PYTHON) backends/native_headless/tests/integration.py --output $(NATIVE_OUTPUT)
+	PYTHONPATH=$(NATIVE_SRC) $(PYTHON) backends/native_headless/tests/integration.py --output $(NATIVE_OUTPUT)
 
-MENTOR_PYTHON ?= python3
 MENTOR_CARGO ?= cargo
 MENTOR_CARGO_FLAGS ?=
 MENTOR_SOURCE := external/spire-mentor
@@ -42,17 +41,21 @@ mentor-deps:
 mentor-build:
 	@case "$$(uname -s)" in Darwin|Linux) ;; *) echo 'MentorのビルドはmacOS/Linux用です'; exit 1;; esac
 	@test -z "$$(git -C $(MENTOR_SOURCE) status --porcelain --untracked-files=no)" || (echo 'Mentorソースに未コミット変更があります'; exit 1)
-	cd $(MENTOR_SOURCE)/sts2-rs && CARGO_TARGET_DIR="$(MENTOR_TARGET)" PYO3_PYTHON="$(MENTOR_PYTHON)" "$(MENTOR_CARGO)" build --locked --release -p sts2-py --features pyo3/extension-module --jobs 2 $(MENTOR_CARGO_FLAGS)
+	cd $(MENTOR_SOURCE)/sts2-rs && CARGO_TARGET_DIR="$(MENTOR_TARGET)" PYO3_PYTHON="$(PYTHON)" "$(MENTOR_CARGO)" build --locked --release -p sts2-py --features pyo3/extension-module --jobs 2 $(MENTOR_CARGO_FLAGS)
 	cp "$(MENTOR_TARGET)/release/libsts2_rs.$(MENTOR_LIB_EXT)" local/mentor/sts2_rs.abi3.so
 
 mentor-test:
-	$(MENTOR_PYTHON) -B -m unittest discover -s agents/mentor/tests
+	$(PYTHON) -B -m unittest discover -s agents/mentor/tests
 
 sts2-test:
-	$(NATIVE_PYTHON) -B -m unittest discover -s sts2/tests
+	$(PYTHON) -B -m unittest discover -s sts2/tests
+
+.PHONY: runners-test
+
+runners-test:
+	$(PYTHON) -B -m unittest discover -s runners/tests
 
 LEARN_DOTNET ?= dotnet
-LEARN_PYTHON ?= python3
 LEARN_GAME_LIBS ?=
 
 .PHONY: learn-deps learn-build learn-test
@@ -65,4 +68,4 @@ learn-build:
 	cd external/learn-the-spire && "$(LEARN_DOTNET)" build addons/public-observation/public-observation.sln -c Release -p:GameLibDir="$(abspath $(LEARN_GAME_LIBS))"
 
 learn-test:
-	$(LEARN_PYTHON) -B -m unittest discover -s backends/learn_dll/tests
+	$(PYTHON) -B -m unittest discover -s backends/learn_dll/tests

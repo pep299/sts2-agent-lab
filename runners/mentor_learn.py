@@ -25,7 +25,7 @@ def main():
     args = parser.parse_args()
     if min(x for x in (args.sims, args.boss_sims, args.seconds, args.max_steps) if x is not None) <= 0:
         parser.error('探索回数・時間・操作上限は正の整数を指定')
-    command = [sys.executable, '-B', '-m', 'agents.mentor.policy', '--config', str(args.config.resolve())]
+    command = [sys.executable, '-B', '-m', 'agents.mentor', '--config', str(args.config.resolve())]
     for flag, value in [('--sims', args.sims), ('--boss-sims', args.boss_sims)]:
         if value is not None:
             command += [flag, str(value)]

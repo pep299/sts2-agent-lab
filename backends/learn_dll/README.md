@@ -9,6 +9,6 @@ make learn-test
 python3 runners/mentor_learn.py --help
 ```
 
-`LEARN_DOTNET`・`LEARN_PYTHON`で導入済み実行ファイルを指定する。`LEARN_GAME_LIBS`は既存DLLの参照先で、アプリを複製しない。Mentorを使う場合は[方策の準備](../../agents/mentor/README.md)も行う。
+`LEARN_DOTNET`・`PYTHON`で導入済み実行ファイルを指定する。`LEARN_GAME_LIBS`は既存DLLの参照先で、アプリを複製しない。Mentorを使う場合は[方策の準備](../../agents/mentor/README.md)も行う。
 
 別の方策は`python3 -m backends.learn_dll.batch --help`からJSON Linesコマンドを指定できる。結果は`local/learn_dll/results`へ保存する。`seeded_all_unlocked`は全解放状態であり、所有者プロフィールの再現ではない。

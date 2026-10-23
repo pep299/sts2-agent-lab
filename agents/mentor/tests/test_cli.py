@@ -14,7 +14,7 @@ CONFIG = Path(os.environ.get('MENTOR_CONFIG', REPO / 'config/mentor.example.toml
 class PolicyCliContract(unittest.TestCase):
     def test_initialization_and_cli_budget_override_from_another_directory(self):
         with tempfile.TemporaryDirectory() as directory:
-            result = subprocess.run([sys.executable, '-B', '-m', 'agents.mentor.policy',
+            result = subprocess.run([sys.executable, '-B', '-m', 'agents.mentor',
                                      '--config', str(CONFIG), '--sims', '7'],
                                     input='', capture_output=True, text=True, cwd=directory,
                                     env=dict(os.environ, PYTHONPATH=str(REPO)), timeout=30)
@@ -31,7 +31,7 @@ class PolicyCliContract(unittest.TestCase):
             config = tomllib.loads(CONFIG.read_text())
             invalid = Path(directory) / 'invalid.toml'
             invalid.write_text(CONFIG.read_text().replace(config['identity']['model_sha256'], '0' * 64))
-            result = subprocess.run([sys.executable, '-B', '-m', 'agents.mentor.policy',
+            result = subprocess.run([sys.executable, '-B', '-m', 'agents.mentor',
                                      '--config', str(invalid)], input='', capture_output=True,
                                     text=True, cwd=REPO, timeout=30)
             self.assertNotEqual(result.returncode, 0)
