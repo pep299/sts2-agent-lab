@@ -55,6 +55,37 @@ def infer_enemy_moves(wire, engine):
     return wire
 
 
+def wire_cards(items, registries):
+    output = []
+    for i, item in enumerate(items):
+        c = card_state(item)
+        if c.get('special'):
+            raise Unsupported(f'カードの付与・特殊値の戦闘接続は未実装: {c["id"]}')
+        facts = c['facts']
+        cost = facts['energyCost']
+        row = {'id': resolve(c['id'], registries['card'], ('_CARD', '_STATUS')),
+               'stable_idx': i, 'kind': {'Status': 'status', 'Curse': 'curse'}.get(facts['type'], 'card'),
+               'upgraded': c['upgrade'] > 0, 'base_cost': -1 if cost['costsX'] else cost['canonical'],
+               'cost_override': -1 if cost['costsX'] else cost['current'],
+               'flags': [k.lower() for k in c['keywords'] if k in {'Retain', 'Ethereal', 'Innate', 'Unplayable'}]}
+        variables = {v['name']: v['baseValue'] for v in facts['dynamicVars']}
+        for source, target in [('Damage', 'base_damage'), ('Block', 'base_block')]:
+            if source in variables:
+                row[target] = int(variables[source])
+        if c.get('enchantment'):
+            effect = c['enchantment']
+            row.update(enchantment=resolve(effect['id'], registries.get('enchantment', set())),
+                       enchantment_amount=effect['amount'])
+        if c.get('affliction'):
+            effect = c['affliction']
+            name = AFFLICTIONS.get(entry(effect['id']))
+            if name is None:
+                raise Unsupported(f'カード汚染の接続は未確認: {effect["id"]}')
+            row.update(affliction=name, affliction_stacks=effect['amount'])
+        output.append(row)
+    return output
+
+
 def make_wire(observation, registries, engine=None):
     status = observation['state']['status']
     combat = status['combat']
@@ -71,36 +102,6 @@ def make_wire(observation, registries, engine=None):
             output.append({'name': resolve(p['id'], registries['power']), 'amount': p['amount']})
         return output
 
-    def cards(items):
-        output = []
-        for i, item in enumerate(items):
-            c = card_state(item)
-            if c.get('special'):
-                raise Unsupported(f'カードの付与・特殊値の戦闘接続は未実装: {c["id"]}')
-            facts = c['facts']
-            cost = facts['energyCost']
-            row = {'id': resolve(c['id'], registries['card'], ('_CARD', '_STATUS')),
-                   'stable_idx': i, 'kind': {'Status': 'status', 'Curse': 'curse'}.get(facts['type'], 'card'),
-                   'upgraded': c['upgrade'] > 0, 'base_cost': -1 if cost['costsX'] else cost['canonical'],
-                   'cost_override': -1 if cost['costsX'] else cost['current'],
-                   'flags': [k.lower() for k in c['keywords'] if k in {'Retain', 'Ethereal', 'Innate', 'Unplayable'}]}
-            variables = {v['name']: v['baseValue'] for v in facts['dynamicVars']}
-            for source, target in [('Damage', 'base_damage'), ('Block', 'base_block')]:
-                if source in variables:
-                    row[target] = int(variables[source])
-            if c.get('enchantment'):
-                effect = c['enchantment']
-                row.update(enchantment=resolve(effect['id'], registries.get('enchantment', set())),
-                           enchantment_amount=effect['amount'])
-            if c.get('affliction'):
-                effect = c['affliction']
-                name = AFFLICTIONS.get(entry(effect['id']))
-                if name is None:
-                    raise Unsupported(f'カード汚染の接続は未確認: {effect["id"]}')
-                row.update(affliction=name, affliction_stacks=effect['amount'])
-            output.append(row)
-        return output
-
     encounter = []
     for enemy in combat['enemies']:
         intents = []
@@ -114,13 +115,13 @@ def make_wire(observation, registries, engine=None):
     graph = status['map']
     node = next((n for n in graph['nodes'] if n['coord'] == graph['current']), None) if graph else None
     room = node['roomType'] if node else ''
-    deck = {target: cards(combat[source]['cards']) for source, target in
+    deck = {target: wire_cards(combat[source]['cards'], registries) for source, target in
             [('hand', 'hand'), ('draw', 'draw_pile'), ('discard', 'discard_pile'), ('exhaust', 'exhaust_pile')]}
     deck['draw_pile'].sort(key=lambda c: json.dumps({k: v for k, v in c.items() if k != 'stable_idx'}, sort_keys=True))
     for i, c in enumerate(deck['draw_pile']):
         c['stable_idx'] = i
-    deck['master_deck'] = cards(status['deckCards'])
-    deck['play_pile'] = cards(combat.get('play', {}).get('cards', []))
+    deck['master_deck'] = wire_cards(status['deckCards'], registries)
+    deck['play_pile'] = wire_cards(combat.get('play', {}).get('cards', []), registries)
     wire = {'wire_version': 1, 'game_version': 'v0.111.0', 'phase': 'PlayerPlayPhase',
             'round': combat['turn'], 'turn': combat['turn'], 'side': 'Player', 'combat_id': 0,
             'is_elite': room == 'Elite', 'intent_amounts': 'effective', 'deck': deck, 'encounter': encounter,

@@ -3,6 +3,10 @@ import math
 from sts2.observation import Unsupported, card_state, metadata
 
 
+class UnscoredSelection(Unsupported):
+    """公開カード選択は有効だが、配布モデルの採点へ対応していない。"""
+
+
 def strategic_actions(observation):
     combat = observation['state']['phase'] == 'combat'
     return [a for a in observation['actions'] if a['kind'] != 'discard_potion'
@@ -25,7 +29,6 @@ class NoncombatPolicy:
     def __init__(self, runtime):
         self.engine = runtime.engine
         self.net = runtime.net
-        self.selection_fallback = False
         self.reset()
 
     def reset(self):
@@ -75,8 +78,10 @@ class NoncombatPolicy:
         selection = state['selection']
         if state['status']['combat'] is not None:
             raise Unsupported('戦闘中の子選択を探索状態へ対応させる接続は未実装')
-        if selection is None or selection['min'] < 1:
-            raise Unsupported('任意枚数の選択は未実装')
+        if selection is None:
+            raise Unsupported('公開カード選択がない')
+        if selection['min'] < 1:
+            raise UnscoredSelection('任意枚数の選択はモデル採点へ未対応')
         cards = selection['cards']
         # 共通観測の生成だけを既存Rustビルダーに任せる。
         packet = self.engine.ppo_wire_obs(base | {'type': 'card_reward', 'cards': [], 'can_skip': True}, 'card_reward')
@@ -85,7 +90,7 @@ class NoncombatPolicy:
         obs.pop('card_reward_option_upgraded', None)
         obs['phase'] = 'card_select'
         pairs = [(card(c)['id'], bool(card(c)['upgrade_level'])) for c in cards]
-        purpose = selection['purpose'].lower()
+        purpose = (selection.get('purpose') or '').lower()
         if 'transform' in purpose or 'enchant' in purpose:
             name = 'transform' if 'transform' in purpose else 'enchant'
             deck = [(c['id'], bool(c['upgrade_level'])) for c in base['run_state']['master_deck']]
@@ -103,7 +108,7 @@ class NoncombatPolicy:
             obs['card_grant_options'] = pairs
             kind = 'grant_deck_card'
         else:
-            raise Unsupported(f'選択目的が未対応: {selection["purpose"]}')
+            raise UnscoredSelection(f'選択目的がモデル採点へ未対応: {selection.get("purpose")}')
         packet['actions'] = [{'action': kind, 'idx': i} for i in range(len(cards))]
         probs, value = self.net.distribution(obs, packet['actions'], {})
         count = selection['min']
@@ -135,12 +140,10 @@ class NoncombatPolicy:
                 base['options'].append(row)
         elif state['phase'] == 'rest':
             surface = 'rest_site'
+            actions = [a for a in actions if metadata(a)['option_key'] in {'HEAL', 'SMITH'}]
+            if not actions:
+                raise Unsupported('配布モデルで採点できる休憩候補がない')
             labels = [metadata(a)['option_key'] for a in actions]
-            if labels != ['HEAL', 'SMITH'] and self.selection_fallback:
-                actions = [a for a in actions if metadata(a)['option_key'] in {'HEAL', 'SMITH'}]
-                labels = [metadata(a)['option_key'] for a in actions]
-            if labels != ['HEAL', 'SMITH']:
-                raise Unsupported(f'配布休憩ビルダーとの対応が未確認: {labels}')
             base['options'] = [dict(index=i, id=label, enabled=True) for i, label in enumerate(labels)]
         elif state['phase'] == 'shop':
             destinations = [a for a in actions if a['kind'] == 'map']
@@ -202,6 +205,9 @@ class NoncombatPolicy:
         packet = self.engine.ppo_wire_obs(base, surface)
         if packet is None or any(a['action'] == 'unknown' for a in packet['actions']):
             raise Unsupported(f'Mentorの入力ビルダーが候補を扱えない: {surface}')
+        if surface == 'rest_site':
+            packet['actions'] = [{'action': 'rest_option', 'idx': {'HEAL': 0, 'SMITH': 1}[label]}
+                                 for label in labels]
         responses = []
         for response in packet['responses']:
             if response['action'] == 'choose':

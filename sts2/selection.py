@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 
-from sts2.observation import Unsupported, entry
+from sts2.observation import entry
 
 
 class SelectionContext:
@@ -25,7 +25,7 @@ class SelectionContext:
             elif state['status']['combat'] is not None:
                 selection['purpose'] = 'combat_choice'
             else:
-                raise Unsupported('公開選択の目的がなく、直前の公開行動からも特定できない')
+                selection['purpose'] = None
         if not selection.get('enchantment'):
             selection['enchantment'] = self.selection_enchantment
         return obs

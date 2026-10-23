@@ -6,6 +6,12 @@ permissions:
   contents: read
 
 jobs:
+  transport:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - run: make transport-test
+
   native:
     runs-on: ubuntu-24.04
     steps:
@@ -17,9 +23,3 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: make sts2-test
-
-  runners:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - run: make runners-test

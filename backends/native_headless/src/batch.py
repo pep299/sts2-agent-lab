@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 import traceback
+from configuration import REPO
 from runtime import NativeEnvironment,EnvironmentFault,DeclaredLimit,Unsupported,RequestRejected,write_json,RESULTS
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[3]))
@@ -70,10 +71,24 @@ def run_batch(specs,output,choose,*,fault_hook=None):
     finally:repair.close()
     return summarize(runs,len(specs))
 
-if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--plan',type=Path,required=True);parser.add_argument('--output',type=Path,required=True)
-    parser.add_argument('--policy-command',nargs=argparse.REMAINDER,required=True);args=parser.parse_args()
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--plan',type=Path,required=True)
+    parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--policy-cwd',type=Path,default=REPO,
+                        help='方策プロセスの作業ディレクトリ。既定はこのリポジトリ')
+    parser.add_argument('--policy-command',nargs=argparse.REMAINDER,required=True,
+                        help='最後に指定する。以降を方策プロセスのコマンドとして渡す')
+    args=parser.parse_args()
+    if not args.policy_command:parser.error('方策コマンドを指定してください')
     specs=json.loads(args.plan.read_text())
-    policy=JsonLinePolicy(args.policy_command,args.output.with_suffix('.policy-stderr.log'))
-    try:print(json.dumps(run_batch(specs,args.output,policy),ensure_ascii=False))
+    output=args.output.resolve()
+    if not output.is_relative_to(RESULTS) or output.exists():
+        parser.error('出力はnativeのresults内に、存在しないパスを指定してください')
+    output.parent.mkdir(parents=True,exist_ok=True)
+    policy=JsonLinePolicy(args.policy_command,output.with_suffix('.policy-stderr.log'),cwd=args.policy_cwd)
+    try:print(json.dumps(run_batch(specs,output,policy),ensure_ascii=False))
     finally:policy.close()
+
+
+if __name__=='__main__':main()

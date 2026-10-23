@@ -28,16 +28,22 @@ class MentorRuntime:
         config = tomllib.loads(Path(configuration).read_text())
         library = asset_path(config['paths']['extension'])
         model = asset_path(config['paths']['model'])
-        if sha(model) != config['identity']['model_sha256']:
+        expected = config.get('identity', {})
+        model_hash = sha(model)
+        if 'model_sha256' in expected and model_hash != expected['model_sha256']:
             raise ValueError('Mentor model hash differs from configuration')
-        spec = importlib.util.spec_from_file_location('sts2_rs', library,
-                    loader=ExtensionFileLoader('sts2_rs', str(library)))
+        spec = importlib.util.spec_from_file_location('mentor_rs', library,
+                    loader=ExtensionFileLoader('mentor_rs', str(library)))
         self.engine = importlib.util.module_from_spec(spec)
-        sys.modules['sts2_rs'] = self.engine
+        sys.modules['mentor_rs'] = self.engine
         spec.loader.exec_module(self.engine)
-        if self.engine.build_git() != config['identity']['build_git']:
+        build_git = self.engine.build_git()
+        if 'build_git' in expected and build_git != expected['build_git']:
             raise ValueError('Mentor extension build differs from configuration')
-        self.net = self.engine.PpoNetPolicy(str(model), config['identity']['features'])
+        features = expected.get('features', '')
+        self.net = self.engine.PpoNetPolicy(str(model), features)
+        self.identity = {'build_git': build_git, 'extension_sha256': sha(library),
+                         'model_sha256': model_hash, 'features': features}
         self.search = config['search']
         if any(type(self.search.get(k)) is not int or self.search[k] < 1
                for k in ('sims', 'boss_sims', 'threads')):
