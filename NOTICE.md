@@ -12,3 +12,5 @@ nativeブリッジと共有投影は**独自保守**とし、上流HEADへの定
 `external/sts2-sim`は独立したsubmoduleで、そちらのライセンスに従う。ゲーム本体・資源・保存データはこのrepoのMIT許諾対象ではない。本プロジェクトはMega Critの公式製品・提携プロジェクトではない。
 
 `external/spire-mentor`は[Spire Mentor](https://github.com/tfriedel/spire-mentor)の固定commitを参照するsubmodule。ソース・配布学習済みネットワークのMIT許諾は同submoduleの`LICENSE`・`NOTICE`に従う。`agents/mentor`はそのRust推論API・モデルを利用する公開観測アダプターで、上流ソースを複製・変更しない。更新時はcommit・モデルSHA・入力対応の回帰試験を揃えて変更する。
+
+`external/learn-the-spire`は[pep299/learn-the-spire](https://github.com/pep299/learn-the-spire)のv0.111対応と公開観測アドオンを固定commitで参照する。元実装のUnlicenseと、取り込まれた第三者コードの許諾は同submoduleの`LICENSE`・`NOTICE.md`を参照する。ゲームDLLは含めず、所有する入力をビルド時に指定する。

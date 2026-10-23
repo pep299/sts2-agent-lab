@@ -388,9 +388,14 @@ def main():
     parser.add_argument('--config', type=Path, default=default_config())
     parser.add_argument('--sims', type=int)
     parser.add_argument('--boss-sims', type=int)
+    parser.add_argument('--backend', choices=['native', 'learn'], default='native')
     parser.add_argument('--allow-selection-fallback', action='store_true')
     args = parser.parse_args()
-    policy = Mentor(args.config)
+    context = None
+    if args.backend == 'learn':
+        from learn_observation import LearnObservation
+        context = LearnObservation()
+    policy = Mentor(args.config, context=context)
     policy.selection_fallback = args.allow_selection_fallback
     for key, value in [('sims', args.sims), ('boss_sims', args.boss_sims)]:
         if value is not None:
@@ -398,10 +403,11 @@ def main():
                 parser.error('探索回数は正の整数を指定')
             policy.search[key] = value
     print(json.dumps({'kind': 'policy_initialized', 'build_git': policy.engine.build_git(),
-                      'selection_fallback': policy.selection_fallback,
+                      'backend': args.backend, 'selection_fallback': policy.selection_fallback,
                       'search': policy.search, 'config_sha256': sha(args.config),
                       'source_sha256': {name: sha(Path(__file__).parent / name) for name in
-                          ['policy.py', 'combat.py', 'nested_combat.py', 'selection_context.py']}},
+                          ['policy.py', 'combat.py', 'nested_combat.py', 'selection_context.py'] +
+                          (['learn_observation.py'] if args.backend == 'learn' else [])}},
                      ensure_ascii=False), file=sys.stderr, flush=True)
     for line in sys.stdin:
         if line.strip():

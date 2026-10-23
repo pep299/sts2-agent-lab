@@ -19,3 +19,4 @@ jobs:
       - run: make mentor-build
       - run: make mentor-test
       - run: make native-test
+      - run: make learn-test
