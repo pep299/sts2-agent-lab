@@ -22,9 +22,8 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
-      - run: make setup
-      - run: make build-all
-      - run: bash scripts/package-chat.sh
+      - run: make chat-bundle-prepare
+      - run: make chat-bundle
       - name: Check bundle size (500 MB)
         run: test "$(stat -c%s dist/sts2-chat.tar.gz)" -le 500000000
 

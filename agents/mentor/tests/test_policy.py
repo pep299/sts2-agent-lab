@@ -4,9 +4,10 @@ import unittest
 from contextlib import redirect_stderr
 from io import StringIO
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from combat import Unsupported
-from policy import Mentor, reward_claims
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from agents.mentor.combat import Unsupported
+from agents.mentor.policy import Mentor
+from agents.mentor.noncombat import reward_claims
 
 
 def base():
@@ -21,7 +22,7 @@ class PolicyContract(unittest.TestCase):
         policy.repeated_decisions = 0
         obs = base()
         obs['state'].update(phase='grid_selection', selection={'min': 2, 'max': 3, 'cards': [{}, {}, {}]})
-        obs['actions'] = [{'id': 'dll:select_cards', 'detail': {'parameter': 'cardIndices'}}]
+        obs['actions'] = [{'id': 'choose_cards:', 'detail': {'parameter': 'cardIndices'}}]
         boundary = {'decision_id': 9, 'observation': obs}
         with self.assertRaises(Unsupported):
             policy.fallback_selection(boundary, Unsupported('unknown purpose'))

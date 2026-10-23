@@ -11,14 +11,15 @@ class DeclaredLimit(EnvironmentFault):pass
 class PolicyFault(RuntimeError):pass
 
 class JsonLinePolicy:
-    def __init__(self,command,output,timeout=30):
-        self.stderr=Path(output).open('x');self.timeout=timeout;self.command=command;self.process=None
+    def __init__(self,command,output,timeout=30,*,cwd=None):
+        self.stderr=Path(output).open('x');self.timeout=timeout;self.command=command;self.process=None;self.cwd=cwd
         try:self._start()
         except BaseException:self.stderr.close();raise
 
     def _start(self):
         if self.stderr.closed:raise PolicyFault('policy_closed')
-        self.process=subprocess.Popen(self.command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=self.stderr,bufsize=0)
+        self.process=subprocess.Popen(self.command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=self.stderr,bufsize=0,
+                cwd=self.cwd)
         os.set_blocking(self.process.stdin.fileno(),False)
         os.set_blocking(self.process.stdout.fileno(),False)
 

@@ -6,10 +6,11 @@ from pathlib import Path
 import sys
 
 REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / 'backends/native_headless/src'))
 from batch import JsonLinePolicy, run_batch
 from runtime import RESULTS
-from policy import default_config
+from agents.mentor.runtime import default_config
 
 
 def main():
@@ -29,7 +30,7 @@ def main():
     if not output.is_relative_to(RESULTS) or output.exists():
         parser.error('出力はnative_headlessのresults内の新しいパスを指定')
     output.parent.mkdir(parents=True, exist_ok=True)
-    command = [sys.executable, '-B', str(REPO / 'agents/mentor/policy.py'),
+    command = [sys.executable, '-B', '-m', 'agents.mentor.policy',
                '--config', str(args.config)]
     for flag, value in [('--sims', args.sims), ('--boss-sims', args.boss_sims)]:
         if value is not None:
@@ -37,7 +38,7 @@ def main():
     if args.allow_selection_fallback:
         command.append('--allow-selection-fallback')
     policy = JsonLinePolicy(command,
-             output.with_suffix('.policy-stderr.log'))
+             output.with_suffix('.policy-stderr.log'), cwd=REPO)
     try:
         specs = [{'seed': seed, 'runSeconds': args.seconds, 'maxSteps': args.max_steps} for seed in args.seed]
         print(json.dumps(run_batch(specs, output, policy), ensure_ascii=False), flush=True)

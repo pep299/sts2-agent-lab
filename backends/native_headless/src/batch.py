@@ -72,7 +72,7 @@ def run_batch(specs,output,choose,*,fault_hook=None):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--plan',type=Path,required=True);parser.add_argument('--output',type=Path,required=True)
-    parser.add_argument('--policy-command',nargs='+',required=True);args=parser.parse_args()
+    parser.add_argument('--policy-command',nargs=argparse.REMAINDER,required=True);args=parser.parse_args()
     specs=json.loads(args.plan.read_text())
     policy=JsonLinePolicy(args.policy_command,args.output.with_suffix('.policy-stderr.log'))
     try:print(json.dumps(run_batch(specs,args.output,policy),ensure_ascii=False))

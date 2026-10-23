@@ -3,8 +3,8 @@ from pathlib import Path
 import sys
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from combat import Unsupported, is_boss, make_wire, match_action
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from agents.mentor.combat import Unsupported, is_boss, make_wire, match_action
 
 
 def observation():
