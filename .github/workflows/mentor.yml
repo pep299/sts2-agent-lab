@@ -1,0 +1,21 @@
+name: Mentor
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  public-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      RUSTUP_TOOLCHAIN: '1.96.0'
+      MENTOR_CONFIG: config/mentor.example.toml
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - run: make mentor-setup
+      - run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
+      - run: make mentor-build
+      - run: make mentor-test
+      - run: make native-test

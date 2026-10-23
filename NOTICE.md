@@ -10,3 +10,5 @@ nativeブリッジと共有投影は**独自保守**とし、上流HEADへの定
 ゲーム対応更新や不具合修正では、上流差分から原因に関係する変更だけを選び、この実行器の回帰試験を通して採用する。採用元のcommitは取り込みcommitに記録する。通信型・描画抑制を含めmod全体がこちらの保守対象となる。
 
 `external/sts2-sim`は独立したsubmoduleで、そちらのライセンスに従う。ゲーム本体・資源・保存データはこのrepoのMIT許諾対象ではない。本プロジェクトはMega Critの公式製品・提携プロジェクトではない。
+
+`external/spire-mentor`は[Spire Mentor](https://github.com/tfriedel/spire-mentor)の固定commitを参照するsubmodule。ソース・配布学習済みネットワークのMIT許諾は同submoduleの`LICENSE`・`NOTICE`に従う。`agents/mentor`はそのRust推論API・モデルを利用する公開観測アダプターで、上流ソースを複製・変更しない。更新時はcommit・モデルSHA・入力対応の回帰試験を揃えて変更する。

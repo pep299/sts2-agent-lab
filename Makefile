@@ -3,7 +3,7 @@ SIM := external/sts2-sim/Sts2Sim.sln
 .PHONY: setup build-all build-sim
 
 setup:
-	git submodule update --init --recursive
+	git submodule update --init --recursive external/sts2-sim
 
 build-all: build-sim
 
@@ -27,3 +27,17 @@ native-test:
 
 native-verify:
 	PYTHONPATH=$(NATIVE_SRC) $(NATIVE_PYTHON) backends/native_headless/tests/integration.py --output $(NATIVE_OUTPUT)
+
+MENTOR_PYTHON ?= python3
+MENTOR_CARGO ?= cargo
+
+.PHONY: mentor-setup mentor-build mentor-test
+
+mentor-setup:
+	git submodule update --init --recursive external/spire-mentor
+
+mentor-build:
+	$(MENTOR_PYTHON) -B agents/mentor/build.py --cargo $(MENTOR_CARGO)
+
+mentor-test:
+	$(MENTOR_PYTHON) -B -m unittest discover -s agents/mentor/tests

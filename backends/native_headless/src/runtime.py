@@ -29,8 +29,8 @@ def write_json(path,value):
         json.dump(value,f,ensure_ascii=False,indent=2);f.write('\n');f.flush();os.fsync(f.fileno())
     temp.replace(path)
 
-class EnvironmentFault(RuntimeError):pass
-class DeclaredLimit(EnvironmentFault):pass
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'common'))
+from policy_io import EnvironmentFault,DeclaredLimit
 class Unsupported(EnvironmentFault):pass
 class RequestRejected(ValueError):pass
 
