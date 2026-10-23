@@ -4,14 +4,21 @@ import tempfile
 import time
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from learn_environment import LearnEnvironment
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from backends.learn_dll.learn_environment import LearnEnvironment
 
 HOST = '''import json
 import sys
 import time
+from pathlib import Path
+log = Path(sys.argv[sys.argv.index('--log') + 1]).open('x')
+run_seed = None
 for line in sys.stdin:
     request = json.loads(line)
+    log.write(json.dumps(request) + '\\n')
+    log.flush()
+    if request['cmd'] == 'reset':
+        run_seed = request['seed']
     if request['cmd'] == 'close':
         break
     if request.get('seed') == 'SLOW':
@@ -19,10 +26,11 @@ for line in sys.stdin:
     if request.get('seed') == 'ERROR':
         print(json.dumps({'error': 'unsupported_fixture'}), flush=True)
         continue
-    print(json.dumps({'state': {'phase': 'grid_selection', 'terminal': None,
+    print(json.dumps({'state': {'phase': 'grid_selection', 'terminal': 'victory' if run_seed == 'COMPLETE' and request['cmd'] == 'step' else None,
+        'status': {'map': None, 'act': 1, 'floor': 0, 'hp': 80, 'maxHp': 80},
         'selection': {'min': 1, 'max': 2, 'cards': [{}, {}, {}]}},
-        'actions': [{'id': 'public:choice', 'detail': {'nativeOptionIndex': 7}},
-                    {'id': 'dll:select_cards', 'detail': {'parameter': 'cardIndices'}}],
+        'actions': [{'id': 'public:choice', 'detail': {'nativeKind': 'EndTurn', 'nativeOptionIndex': 7}},
+                    {'id': 'dll:select_cards', 'detail': {'nativeKind': 'SelectCards', 'parameter': 'cardIndices'}}],
         'received': request}), flush=True)
 '''
 

@@ -3,7 +3,7 @@
 from copy import deepcopy
 import json
 
-from combat import Unsupported
+from sts2.observation import Unsupported
 
 
 def card_key(card):

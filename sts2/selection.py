@@ -1,6 +1,8 @@
 """公開した親行動から、続くカード選択の効果を保持する。"""
 
-from combat import entry
+from copy import deepcopy
+
+from sts2.observation import Unsupported, entry
 
 
 class SelectionContext:
@@ -11,8 +13,22 @@ class SelectionContext:
         self.selection_purpose = None
         self.selection_enchantment = None
 
-    def normalize(self, observation):
-        return observation
+    def prepare(self, observation):
+        state = observation['state']
+        if not state.get('selection'):
+            return observation
+        obs = deepcopy(observation)
+        selection = obs['state']['selection']
+        if not selection.get('purpose'):
+            if self.selection_purpose:
+                selection['purpose'] = self.selection_purpose
+            elif state['status']['combat'] is not None:
+                selection['purpose'] = 'combat_choice'
+            else:
+                raise Unsupported('公開選択の目的がなく、直前の公開行動からも特定できない')
+        if not selection.get('enchantment'):
+            selection['enchantment'] = self.selection_enchantment
+        return obs
 
     def remember(self, observation, response):
         if observation['state']['phase'] == 'grid_selection':

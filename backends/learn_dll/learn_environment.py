@@ -7,6 +7,8 @@ import selectors
 import subprocess
 import time
 
+from backends.learn_dll.observation import normalize_observation
+
 
 class LearnEnvironment:
     def __init__(self, root, dotnet, output, timeout=35):
@@ -55,7 +57,8 @@ class LearnEnvironment:
         if 'error' in observation:
             raise RuntimeError('learn_public_host_error:' + observation['error'])
         self.decision_id += 1
-        self.last = {'decision_id': self.decision_id, 'observation': observation}
+        self.actions = observation['actions']
+        self.last = {'decision_id': self.decision_id, 'observation': normalize_observation(observation)}
         return self.last
 
     def reset(self, seed, deadline=None):
@@ -65,7 +68,7 @@ class LearnEnvironment:
                              'actGeneration': 'seeded_all_unlocked'}, deadline)
 
     def step(self, decision, deadline=None):
-        actions = self.last['observation']['actions']
+        actions = self.actions
         if decision['action_id'] == 'choose_cards:' and 'indices' in decision:
             if not any(a['detail'].get('parameter') == 'cardIndices' for a in actions):
                 raise ValueError('カード番号を受け付ける候補がない')

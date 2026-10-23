@@ -6,12 +6,7 @@ AFFLICTIONS = {name.upper(): name for name in
                ('Bound', 'Entangled', 'Galvanized', 'Hexed', 'Ringing', 'Smog', 'Weighted', 'Tainted')}
 
 
-class Unsupported(ValueError):
-    pass
-
-
-def entry(value):
-    return value.split('.', 1)[-1]
+from sts2.observation import Unsupported, card_state, entry, is_boss
 
 
 def resolve(raw, names, suffixes=()):
@@ -20,16 +15,6 @@ def resolve(raw, names, suffixes=()):
         if candidate in names:
             return candidate
     raise Unsupported(f'Mentorの語彙にない: {raw}')
-
-
-def card_state(item):
-    return item['cardDetails']['state'] if 'cardDetails' in item else item['state']
-
-
-def is_boss(observation):
-    graph = observation['state']['status']['map']
-    current = graph['current'] if graph else None
-    return bool(current and (current == graph.get('boss') or current == graph.get('secondBoss')))
 
 
 def infer_enemy_moves(wire, engine):

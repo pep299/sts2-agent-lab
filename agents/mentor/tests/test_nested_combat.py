@@ -4,10 +4,10 @@ import sys
 import os
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from combat import AFFLICTIONS, Unsupported, infer_enemy_moves
-from nested_combat import public_projection, resume_choice, search_indices
-from policy import Mentor, default_config, REPO
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from agents.mentor.combat import AFFLICTIONS, Unsupported, infer_enemy_moves
+from agents.mentor.nested_combat import public_projection, resume_choice, search_indices
+from agents.mentor.policy import Mentor, default_config, REPO
 
 
 def wire():
