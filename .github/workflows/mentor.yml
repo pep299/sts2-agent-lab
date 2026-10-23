@@ -1,6 +1,10 @@
 name: Mentor
 
-on: [push, pull_request]
+on: push
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
