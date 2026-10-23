@@ -28,7 +28,7 @@ def run_episode(root, dotnet, output, seed, policy_command, *, seconds=900, max_
     policy = None
     report = {'backend': 'learn_dll', 'outcome': 'interrupted', 'terminal': None,
               'dataValid': False, 'expertData': False, 'steps': 0,
-              'publicOnlyPolicy': True, 'gameEquivalenceCertified': False}
+              'policyInputScope': 'public_observation_and_actions', 'gameEquivalenceCertified': False}
     started = time.monotonic()
     deadline = started + seconds
     try:
