@@ -51,7 +51,7 @@ jobs:
         run: |
           cat > "$RUNNER_TEMP/policy.py" <<'PY'
           def choose(run, actions, agent):
-              return actions[0] if run.phase() == 'map' and actions else None
+              return actions[0] if run.phase() == 'map_choice' and actions else None
           PY
           python3 "$RUNNER_TEMP/mentor-chat/mentor-eval.py" \
             --policy-file "$RUNNER_TEMP/policy.py" --seed 1234 --count 2 \
