@@ -42,7 +42,6 @@ jobs:
           mkdir -p "$package"
           cp local/mentor/mentor_rs.abi3.so "$package/"
           cp -a external/spire-mentor/sts2-pycli/data/ppo "$package/models"
-          cp scripts/mentor-eval.py "$package/"
           cp external/spire-mentor/LICENSE "$package/LICENSE"
           cp external/spire-mentor/NOTICE "$package/NOTICE"
           cp external/spire-mentor/sts2-rs/LICENSE "$package/LICENSE-rust"
