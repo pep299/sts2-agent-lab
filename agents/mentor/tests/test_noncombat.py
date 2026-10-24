@@ -49,6 +49,45 @@ class NoncombatInterface(unittest.TestCase):
         self.assertEqual(response, {'action_id': 'gold'})
         self.assertEqual(info['source'], 'fixed_reward_collection')
 
+    def test_ancient_relic_offers_reach_the_trained_relic_candidates(self):
+        runtime = self.runtime
+
+        class RecordingNet:
+            def distribution(self, obs, actions, features):
+                self.obs, self.actions = obs, actions
+                return runtime.net.distribution(obs, actions, features)
+
+        relics = ['YUMMY_COOKIE', 'BIIIG_HUG', 'SEAL_OF_GOLD']
+        for event_id in ('OROBAS', 'PAEL', 'TEZCATARA', 'NONUPEIPE', 'TANX', 'VAKUU'):
+            for offered in (relics, list(reversed(relics))):
+                with self.subTest(event_id=event_id, offered=offered):
+                    obs = observation('event')
+                    obs['state'].update(eventId=event_id, options=[
+                        {'index': index, 'relic': relic, 'title': None, 'description': None,
+                         'text_key': f'{event_id}.pages.INITIAL.options.{relic}'}
+                        for index, relic in zip((9, 3, 7), offered)])
+                    obs['actions'] = [{'id': f'event:{index}', 'kind': 'event',
+                        'detail': {'metadata': {'option_index': index}}} for index in (9, 3, 7)]
+                    policy = NoncombatPolicy(runtime)
+                    policy.net = RecordingNet()
+                    response, info = policy.choose(obs)
+                    self.assertEqual(policy.net.obs['boss_relic_options'], offered)
+                    self.assertEqual(policy.net.actions,
+                                     [{'action': 'pick_boss_relic', 'idx': i} for i in range(3)])
+                    self.assertEqual(response['action_id'], obs['actions'][info['chosen']]['id'])
+
+    def test_ordinary_relic_event_keeps_its_event_surface(self):
+        obs = observation('event')
+        obs['state'].update(eventId='RELIC_TRADER', options=[
+            {'index': index, 'relic': relic, 'title': None, 'description': None,
+             'text_key': f'RELIC_TRADER.pages.INITIAL.options.{index}'}
+            for index, relic in enumerate(('YUMMY_COOKIE', 'BIIIG_HUG'))])
+        obs['actions'] = [{'id': f'event:{index}', 'kind': 'event',
+            'detail': {'metadata': {'option_index': index}}} for index in range(2)]
+        response, info = NoncombatPolicy(self.runtime).choose(obs)
+        self.assertEqual(info['actions'], [{'action': 'event_choice', 'idx': i} for i in range(2)])
+        self.assertIn(response['action_id'], ('event:0', 'event:1'))
+
     def test_rest_slot_means_heal_or_smith_independent_of_public_order(self):
         class PreferSmith:
             def distribution(self, obs, actions, features):

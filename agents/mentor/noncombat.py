@@ -137,6 +137,7 @@ class NoncombatPolicy:
                 row = dict(o, index=i, label=o['relic'] or o['title'], event_id=state['eventId'])
                 if o['relic']:
                     row['relic'] = {'id': o['relic']}
+                    row['relic_id'] = o['relic']
                 base['options'].append(row)
         elif state['phase'] == 'rest':
             surface = 'rest_site'
