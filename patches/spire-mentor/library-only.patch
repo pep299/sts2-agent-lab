@@ -1,0 +1,13 @@
+diff --git a/sts2-rs/crates/sts2-py/Cargo.toml b/sts2-rs/crates/sts2-py/Cargo.toml
+index 7f86302..47bc554 100644
+--- a/sts2-rs/crates/sts2-py/Cargo.toml
++++ b/sts2-rs/crates/sts2-py/Cargo.toml
+@@ -57,7 +57,7 @@ doc_lazy_continuation = "allow"
+ name = "sts2_rs"
+ # `rlib` so integration tests in `tests/` (bead sts2-rs-92sk) can link
+ # against the crate; `cdylib` is the maturin/pyo3 extension target.
+-crate-type = ["cdylib", "rlib"]
++crate-type = ["rlib"]
+
+ [features]
+ # `extension-module` is activated by maturin (see `pyproject.toml`
