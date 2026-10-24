@@ -2,7 +2,10 @@ using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.AutoSlay.Helpers;
 using MegaCrit.Sts2.Core.Events;
+using MegaCrit.Sts2.Core.Context;
+using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.Events;
+using MegaCrit.Sts2.Core.Runs;
 
 namespace Sts2.NativeSim.FullAppBridge;
 
@@ -52,5 +55,27 @@ public static class NativeEventCompletion
         {
             lock (Gate) { expected = null; accepted = null; }
         }
+    }
+
+    public static async Task CompleteLethalProceedAsync(EventOption option, CancellationToken ct)
+    {
+        var manager = RunManager.Instance ?? throw new InvalidOperationException("Missing event run manager");
+        var run = manager.DebugOnlyGetState() ?? throw new InvalidOperationException("Missing event run state");
+        var player = LocalContext.GetMe(run) ?? throw new InvalidOperationException("Missing event player");
+        if (!option.IsProceed || option.WillKillPlayer?.Invoke(player) != true || run.IsGameOver) return;
+
+        NAbandonRunConfirmPopup? Popup() => UiHelper.FindAll<NAbandonRunConfirmPopup>(((SceneTree)Engine.GetMainLoop()).Root)
+            .SingleOrDefault(p => GodotObject.IsInstanceValid(p) && p.IsVisibleInTree());
+        await WaitHelper.Until(() => run.IsGameOver || Popup() != null, ct, TimeSpan.FromSeconds(15),
+            "Lethal proceed did not reach death or an abandon confirmation");
+        if (run.IsGameOver) return;
+        var popup = Popup() ?? throw new InvalidOperationException("Abandon confirmation disappeared");
+        var controls = UiHelper.FindFirst<NVerticalPopup>(popup)
+            ?? throw new NotSupportedException("Abandon confirmation controls unavailable");
+        await WaitHelper.Until(() => GodotObject.IsInstanceValid(popup) && controls.YesButton.IsEnabled,
+            ct, TimeSpan.FromSeconds(10), "Abandon confirmation is not ready");
+        await UiHelper.Click(controls.YesButton, 0);
+        await WaitHelper.Until(() => manager.IsAbandoned && run.IsGameOver, ct, TimeSpan.FromSeconds(15),
+            "Confirmed abandon did not end the selected run");
     }
 }

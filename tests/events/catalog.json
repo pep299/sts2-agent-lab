@@ -1,0 +1,885 @@
+{
+  "gameHash": "9cb4f1ad8c9f284aa8fec3122ffd6d780bbf543d875c817abdd12ff63fbf12b4",
+  "events": [
+    {
+      "name": "AbyssalBaths",
+      "id": "EVENT.ABYSSAL_BATHS",
+      "category": "event",
+      "pools": [
+        "act:ACT.UNDERDOCKS",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "ABYSSAL_BATHS.pages.ALL.options.EXIT_BATHS",
+        "ABYSSAL_BATHS.pages.ALL.options.LINGER",
+        "ABYSSAL_BATHS.pages.INITIAL.options.ABSTAIN",
+        "ABYSSAL_BATHS.pages.INITIAL.options.IMMERSE"
+      ]
+    },
+    {
+      "name": "Amalgamator",
+      "id": "EVENT.AMALGAMATOR",
+      "category": "event",
+      "pools": [
+        "act:ACT.HIVE",
+        "AllEvents"
+      ],
+      "optionStringLiterals": []
+    },
+    {
+      "name": "AromaOfChaos",
+      "id": "EVENT.AROMA_OF_CHAOS",
+      "category": "event",
+      "pools": [
+        "act:ACT.OVERGROWTH",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "AROMA_OF_CHAOS.pages.INITIAL.options.LET_GO",
+        "AROMA_OF_CHAOS.pages.INITIAL.options.MAINTAIN_CONTROL"
+      ]
+    },
+    {
+      "name": "BattlewornDummy",
+      "id": "EVENT.BATTLEWORN_DUMMY",
+      "category": "event",
+      "pools": [
+        "act:ACT.GLORY",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "BATTLEWORN_DUMMY.pages.INITIAL.options.SETTING_1",
+        "BATTLEWORN_DUMMY.pages.INITIAL.options.SETTING_2",
+        "BATTLEWORN_DUMMY.pages.INITIAL.options.SETTING_3"
+      ]
+    },
+    {
+      "name": "BrainLeech",
+      "id": "EVENT.BRAIN_LEECH",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "BRAIN_LEECH.pages.INITIAL.options.RIP",
+        "BRAIN_LEECH.pages.INITIAL.options.SHARE_KNOWLEDGE"
+      ]
+    },
+    {
+      "name": "Bugslayer",
+      "id": "EVENT.BUGSLAYER",
+      "category": "event",
+      "pools": [
+        "act:ACT.HIVE",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "BUGSLAYER.pages.INITIAL.options.EXTERMINATION",
+        "BUGSLAYER.pages.INITIAL.options.SQUASH"
+      ]
+    },
+    {
+      "name": "ByrdonisNest",
+      "id": "EVENT.BYRDONIS_NEST",
+      "category": "event",
+      "pools": [
+        "act:ACT.OVERGROWTH",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "BYRDONIS_NEST.pages.INITIAL.options.EAT",
+        "BYRDONIS_NEST.pages.INITIAL.options.TAKE"
+      ]
+    },
+    {
+      "name": "ColorfulPhilosophers",
+      "id": "EVENT.COLORFUL_PHILOSOPHERS",
+      "category": "event",
+      "pools": [
+        "act:ACT.HIVE",
+        "AllEvents"
+      ],
+      "optionStringLiterals": []
+    },
+    {
+      "name": "ColossalFlower",
+      "id": "EVENT.COLOSSAL_FLOWER",
+      "category": "event",
+      "pools": [
+        "act:ACT.HIVE",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "COLOSSAL_FLOWER.pages.INITIAL.options.EXTRACT_CURRENT_PRIZE_",
+        "COLOSSAL_FLOWER.pages.INITIAL.options.REACH_DEEPER_",
+        "COLOSSAL_FLOWER.pages.REACH_DEEPER_2.options.EXTRACT_INSTEAD",
+        "COLOSSAL_FLOWER.pages.REACH_DEEPER_2.options.POLLINOUS_CORE"
+      ]
+    },
+    {
+      "name": "CrystalSphere",
+      "id": "EVENT.CRYSTAL_SPHERE",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "CRYSTAL_SPHERE.pages.INITIAL.options.PAYMENT_PLAN",
+        "CRYSTAL_SPHERE.pages.INITIAL.options.UNCOVER_FUTURE"
+      ]
+    },
+    {
+      "name": "Darv",
+      "id": "EVENT.DARV",
+      "category": "ancient",
+      "pools": [
+        "AllAncients"
+      ],
+      "optionStringLiterals": []
+    },
+    {
+      "name": "DenseVegetation",
+      "id": "EVENT.DENSE_VEGETATION",
+      "category": "event",
+      "pools": [
+        "act:ACT.OVERGROWTH",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "DENSE_VEGETATION.pages.INITIAL.options.REST",
+        "DENSE_VEGETATION.pages.INITIAL.options.TRUDGE_ON",
+        "DENSE_VEGETATION.pages.REST.options.FIGHT"
+      ]
+    },
+    {
+      "name": "DollRoom",
+      "id": "EVENT.DOLL_ROOM",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "DOLL_ROOM.pages.INITIAL.options.EXAMINE",
+        "DOLL_ROOM.pages.INITIAL.options.RANDOM",
+        "DOLL_ROOM.pages.INITIAL.options.TAKE_SOME_TIME",
+        "DOLL_ROOM.pages.TAKE.options.TAKE.description"
+      ]
+    },
+    {
+      "name": "DoorsOfLightAndDark",
+      "id": "EVENT.DOORS_OF_LIGHT_AND_DARK",
+      "category": "event",
+      "pools": [
+        "act:ACT.UNDERDOCKS",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "DOORS_OF_LIGHT_AND_DARK.pages.INITIAL.options.DARK",
+        "DOORS_OF_LIGHT_AND_DARK.pages.INITIAL.options.LIGHT"
+      ]
+    },
+    {
+      "name": "DrowningBeacon",
+      "id": "EVENT.DROWNING_BEACON",
+      "category": "event",
+      "pools": [
+        "act:ACT.UNDERDOCKS",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "DROWNING_BEACON.pages.INITIAL.options.BOTTLE",
+        "DROWNING_BEACON.pages.INITIAL.options.CLIMB"
+      ]
+    },
+    {
+      "name": "EndlessConveyor",
+      "id": "EVENT.ENDLESS_CONVEYOR",
+      "category": "event",
+      "pools": [
+        "act:ACT.UNDERDOCKS",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "ENDLESS_CONVEYOR.pages.ALL.options.LOCKED",
+        "ENDLESS_CONVEYOR.pages.GRAB_SOMETHING_OFF_THE_BELT.options.LEAVE",
+        "ENDLESS_CONVEYOR.pages.INITIAL.options.OBSERVE_CHEF"
+      ]
+    },
+    {
+      "name": "FakeMerchant",
+      "id": "EVENT.FAKE_MERCHANT",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": []
+    },
+    {
+      "name": "FieldOfManSizedHoles",
+      "id": "EVENT.FIELD_OF_MAN_SIZED_HOLES",
+      "category": "event",
+      "pools": [
+        "act:ACT.HIVE",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "FIELD_OF_MAN_SIZED_HOLES.pages.INITIAL.options.ENTER_YOUR_HOLE",
+        "FIELD_OF_MAN_SIZED_HOLES.pages.INITIAL.options.RESIST"
+      ]
+    },
+    {
+      "name": "GraveOfTheForgotten",
+      "id": "EVENT.GRAVE_OF_THE_FORGOTTEN",
+      "category": "event",
+      "pools": [
+        "act:ACT.GLORY",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "GRAVE_OF_THE_FORGOTTEN.pages.INITIAL.options.ACCEPT",
+        "GRAVE_OF_THE_FORGOTTEN.pages.INITIAL.options.CONFRONT",
+        "GRAVE_OF_THE_FORGOTTEN.pages.INITIAL.options.CONFRONT_LOCKED"
+      ]
+    },
+    {
+      "name": "HungryForMushrooms",
+      "id": "EVENT.HUNGRY_FOR_MUSHROOMS",
+      "category": "event",
+      "pools": [
+        "act:ACT.GLORY",
+        "AllEvents"
+      ],
+      "optionStringLiterals": []
+    },
+    {
+      "name": "InfestedAutomaton",
+      "id": "EVENT.INFESTED_AUTOMATON",
+      "category": "event",
+      "pools": [
+        "act:ACT.HIVE",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "INFESTED_AUTOMATON.pages.INITIAL.options.STUDY",
+        "INFESTED_AUTOMATON.pages.INITIAL.options.TOUCH_CORE"
+      ]
+    },
+    {
+      "name": "JungleMazeAdventure",
+      "id": "EVENT.JUNGLE_MAZE_ADVENTURE",
+      "category": "event",
+      "pools": [
+        "act:ACT.OVERGROWTH",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "JUNGLE_MAZE_ADVENTURE.pages.INITIAL.options.JOIN_FORCES",
+        "JUNGLE_MAZE_ADVENTURE.pages.INITIAL.options.SOLO_QUEST"
+      ]
+    },
+    {
+      "name": "LostWisp",
+      "id": "EVENT.LOST_WISP",
+      "category": "event",
+      "pools": [
+        "act:ACT.HIVE",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "LOST_WISP.pages.INITIAL.options.CLAIM",
+        "LOST_WISP.pages.INITIAL.options.SEARCH"
+      ]
+    },
+    {
+      "name": "LuminousChoir",
+      "id": "EVENT.LUMINOUS_CHOIR",
+      "category": "event",
+      "pools": [
+        "act:ACT.OVERGROWTH",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "LUMINOUS_CHOIR.pages.INITIAL.options.OFFER_TRIBUTE",
+        "LUMINOUS_CHOIR.pages.INITIAL.options.OFFER_TRIBUTE_LOCKED",
+        "LUMINOUS_CHOIR.pages.INITIAL.options.REACH_INTO_THE_FLESH"
+      ]
+    },
+    {
+      "name": "MorphicGrove",
+      "id": "EVENT.MORPHIC_GROVE",
+      "category": "event",
+      "pools": [
+        "act:ACT.OVERGROWTH",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "MORPHIC_GROVE.pages.INITIAL.options.GROUP",
+        "MORPHIC_GROVE.pages.INITIAL.options.LONER"
+      ]
+    },
+    {
+      "name": "Neow",
+      "id": "EVENT.NEOW",
+      "category": "ancient",
+      "pools": [
+        "AllAncients"
+      ],
+      "optionStringLiterals": []
+    },
+    {
+      "name": "Nonupeipe",
+      "id": "EVENT.NONUPEIPE",
+      "category": "ancient",
+      "pools": [
+        "AllAncients"
+      ],
+      "optionStringLiterals": []
+    },
+    {
+      "name": "Orobas",
+      "id": "EVENT.OROBAS",
+      "category": "ancient",
+      "pools": [
+        "AllAncients"
+      ],
+      "optionStringLiterals": [
+        "OROBAS.pages.INITIAL.options.OPTION_POOL_3_LOCKED"
+      ]
+    },
+    {
+      "name": "Pael",
+      "id": "EVENT.PAEL",
+      "category": "ancient",
+      "pools": [
+        "AllAncients"
+      ],
+      "optionStringLiterals": []
+    },
+    {
+      "name": "PotionCourier",
+      "id": "EVENT.POTION_COURIER",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "POTION_COURIER.pages.INITIAL.options.GRAB_POTIONS",
+        "POTION_COURIER.pages.INITIAL.options.RANSACK"
+      ]
+    },
+    {
+      "name": "PunchOff",
+      "id": "EVENT.PUNCH_OFF",
+      "category": "event",
+      "pools": [
+        "act:ACT.UNDERDOCKS",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "PUNCH_OFF.pages.INITIAL.options.I_CAN_TAKE_THEM",
+        "PUNCH_OFF.pages.INITIAL.options.NAB",
+        "PUNCH_OFF.pages.I_CAN_TAKE_THEM.options.FIGHT"
+      ]
+    },
+    {
+      "name": "RanwidTheElder",
+      "id": "EVENT.RANWID_THE_ELDER",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "RANWID_THE_ELDER.pages.INITIAL.options.GOLD",
+        "RANWID_THE_ELDER.pages.INITIAL.options.POTION",
+        "RANWID_THE_ELDER.pages.INITIAL.options.POTION.description",
+        "RANWID_THE_ELDER.pages.INITIAL.options.POTION.title",
+        "RANWID_THE_ELDER.pages.INITIAL.options.POTION_LOCKED",
+        "RANWID_THE_ELDER.pages.INITIAL.options.RELIC",
+        "RANWID_THE_ELDER.pages.INITIAL.options.RELIC.description",
+        "RANWID_THE_ELDER.pages.INITIAL.options.RELIC.title",
+        "RANWID_THE_ELDER.pages.INITIAL.options.RELIC_LOCKED"
+      ]
+    },
+    {
+      "name": "Reflections",
+      "id": "EVENT.REFLECTIONS",
+      "category": "event",
+      "pools": [
+        "act:ACT.GLORY",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "REFLECTIONS.pages.INITIAL.options.SHATTER",
+        "REFLECTIONS.pages.INITIAL.options.TOUCH_A_MIRROR"
+      ]
+    },
+    {
+      "name": "RelicTrader",
+      "id": "EVENT.RELIC_TRADER",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "RELIC_TRADER.pages.INITIAL.options.BOTTOM",
+        "RELIC_TRADER.pages.INITIAL.options.MIDDLE",
+        "RELIC_TRADER.pages.INITIAL.options.TOP"
+      ]
+    },
+    {
+      "name": "RoomFullOfCheese",
+      "id": "EVENT.ROOM_FULL_OF_CHEESE",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "ROOM_FULL_OF_CHEESE.pages.INITIAL.options.GORGE",
+        "ROOM_FULL_OF_CHEESE.pages.INITIAL.options.SEARCH"
+      ]
+    },
+    {
+      "name": "RoundTeaParty",
+      "id": "EVENT.ROUND_TEA_PARTY",
+      "category": "event",
+      "pools": [
+        "act:ACT.GLORY",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "ROUND_TEA_PARTY.pages.INITIAL.options.ENJOY_TEA",
+        "ROUND_TEA_PARTY.pages.INITIAL.options.PICK_FIGHT",
+        "ROUND_TEA_PARTY.pages.PICK_FIGHT.options.CONTINUE_FIGHT"
+      ]
+    },
+    {
+      "name": "SapphireSeed",
+      "id": "EVENT.SAPPHIRE_SEED",
+      "category": "event",
+      "pools": [
+        "act:ACT.OVERGROWTH",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "SAPPHIRE_SEED.pages.INITIAL.options.EAT",
+        "SAPPHIRE_SEED.pages.INITIAL.options.PLANT"
+      ]
+    },
+    {
+      "name": "SelfHelpBook",
+      "id": "EVENT.SELF_HELP_BOOK",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "SELF_HELP_BOOK.pages.INITIAL.options.NO_OPTIONS",
+        "SELF_HELP_BOOK.pages.INITIAL.options.READ_ENTIRE_BOOK",
+        "SELF_HELP_BOOK.pages.INITIAL.options.READ_ENTIRE_BOOK_LOCKED",
+        "SELF_HELP_BOOK.pages.INITIAL.options.READ_PASSAGE",
+        "SELF_HELP_BOOK.pages.INITIAL.options.READ_PASSAGE_LOCKED",
+        "SELF_HELP_BOOK.pages.INITIAL.options.READ_THE_BACK",
+        "SELF_HELP_BOOK.pages.INITIAL.options.READ_THE_BACK_LOCKED"
+      ]
+    },
+    {
+      "name": "SlipperyBridge",
+      "id": "EVENT.SLIPPERY_BRIDGE",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "SLIPPERY_BRIDGE.pages.INITIAL.options.HOLD_ON_0",
+        "SLIPPERY_BRIDGE.pages.INITIAL.options.OVERCOME"
+      ]
+    },
+    {
+      "name": "SpiralingWhirlpool",
+      "id": "EVENT.SPIRALING_WHIRLPOOL",
+      "category": "event",
+      "pools": [
+        "act:ACT.UNDERDOCKS",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "SPIRALING_WHIRLPOOL.pages.INITIAL.options.DRINK",
+        "SPIRALING_WHIRLPOOL.pages.INITIAL.options.OBSERVE"
+      ]
+    },
+    {
+      "name": "SpiritGrafter",
+      "id": "EVENT.SPIRIT_GRAFTER",
+      "category": "event",
+      "pools": [
+        "act:ACT.HIVE",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "SPIRIT_GRAFTER.pages.INITIAL.options.LET_IT_IN",
+        "SPIRIT_GRAFTER.pages.INITIAL.options.REJECTION"
+      ]
+    },
+    {
+      "name": "StoneOfAllTime",
+      "id": "EVENT.STONE_OF_ALL_TIME",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "STONE_OF_ALL_TIME.pages.INITIAL.options.LIFT",
+        "STONE_OF_ALL_TIME.pages.INITIAL.options.LIFT_LOCKED",
+        "STONE_OF_ALL_TIME.pages.INITIAL.options.PUSH",
+        "STONE_OF_ALL_TIME.pages.INITIAL.options.PUSH_LOCKED"
+      ]
+    },
+    {
+      "name": "SunkenStatue",
+      "id": "EVENT.SUNKEN_STATUE",
+      "category": "event",
+      "pools": [
+        "act:ACT.OVERGROWTH",
+        "act:ACT.UNDERDOCKS",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "SUNKEN_STATUE.pages.INITIAL.options.DIVE_INTO_WATER",
+        "SUNKEN_STATUE.pages.INITIAL.options.GRAB_SWORD"
+      ]
+    },
+    {
+      "name": "SunkenTreasury",
+      "id": "EVENT.SUNKEN_TREASURY",
+      "category": "event",
+      "pools": [
+        "act:ACT.UNDERDOCKS",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "SUNKEN_TREASURY.pages.INITIAL.options.FIRST_CHEST",
+        "SUNKEN_TREASURY.pages.INITIAL.options.SECOND_CHEST"
+      ]
+    },
+    {
+      "name": "Symbiote",
+      "id": "EVENT.SYMBIOTE",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "SYMBIOTE.pages.INITIAL.options.APPROACH",
+        "SYMBIOTE.pages.INITIAL.options.APPROACH_LOCKED",
+        "SYMBIOTE.pages.INITIAL.options.KILL_WITH_FIRE"
+      ]
+    },
+    {
+      "name": "TabletOfTruth",
+      "id": "EVENT.TABLET_OF_TRUTH",
+      "category": "event",
+      "pools": [
+        "act:ACT.OVERGROWTH",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "TABLET_OF_TRUTH.pages.DECIPHER.options.GIVE_UP",
+        "TABLET_OF_TRUTH.pages.INITIAL.options.DECIPHER_1",
+        "TABLET_OF_TRUTH.pages.INITIAL.options.SMASH"
+      ]
+    },
+    {
+      "name": "Tanx",
+      "id": "EVENT.TANX",
+      "category": "ancient",
+      "pools": [
+        "AllAncients"
+      ],
+      "optionStringLiterals": []
+    },
+    {
+      "name": "TeaMaster",
+      "id": "EVENT.TEA_MASTER",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "TEA_MASTER.pages.INITIAL.options.BONE_TEA",
+        "TEA_MASTER.pages.INITIAL.options.BONE_TEA_LOCKED",
+        "TEA_MASTER.pages.INITIAL.options.EMBER_TEA",
+        "TEA_MASTER.pages.INITIAL.options.EMBER_TEA_LOCKED",
+        "TEA_MASTER.pages.INITIAL.options.TEA_OF_DISCOURTESY"
+      ]
+    },
+    {
+      "name": "Tezcatara",
+      "id": "EVENT.TEZCATARA",
+      "category": "ancient",
+      "pools": [
+        "AllAncients"
+      ],
+      "optionStringLiterals": []
+    },
+    {
+      "name": "TheFutureOfPotions",
+      "id": "EVENT.THE_FUTURE_OF_POTIONS",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "THE_FUTURE_OF_POTIONS.pages.INITIAL.options.POTION",
+        "THE_FUTURE_OF_POTIONS.pages.INITIAL.options.POTION.description",
+        "THE_FUTURE_OF_POTIONS.pages.INITIAL.options.POTION.title"
+      ]
+    },
+    {
+      "name": "TheLanternKey",
+      "id": "EVENT.THE_LANTERN_KEY",
+      "category": "event",
+      "pools": [
+        "act:ACT.HIVE",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "THE_LANTERN_KEY.pages.DONE.options.RETURN_THE_KEY.description",
+        "THE_LANTERN_KEY.pages.INITIAL.options.KEEP_THE_KEY",
+        "THE_LANTERN_KEY.pages.INITIAL.options.RETURN_THE_KEY",
+        "THE_LANTERN_KEY.pages.KEEP_THE_KEY.options.FIGHT"
+      ]
+    },
+    {
+      "name": "TheLegendsWereTrue",
+      "id": "EVENT.THE_LEGENDS_WERE_TRUE",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "THE_LEGENDS_WERE_TRUE.pages.INITIAL.options.NAB_THE_MAP",
+        "THE_LEGENDS_WERE_TRUE.pages.INITIAL.options.SLOWLY_FIND_AN_EXIT"
+      ]
+    },
+    {
+      "name": "ThisOrThat",
+      "id": "EVENT.THIS_OR_THAT",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "THIS_OR_THAT.pages.INITIAL.options.ORNATE",
+        "THIS_OR_THAT.pages.INITIAL.options.PLAIN"
+      ]
+    },
+    {
+      "name": "TinkerTime",
+      "id": "EVENT.TINKER_TIME",
+      "category": "event",
+      "pools": [
+        "act:ACT.GLORY",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "TINKER_TIME.pages.CHOOSE_CARD_TYPE.options.ATTACK",
+        "TINKER_TIME.pages.CHOOSE_CARD_TYPE.options.POWER",
+        "TINKER_TIME.pages.CHOOSE_CARD_TYPE.options.SKILL",
+        "TINKER_TIME.pages.CHOOSE_RIDER.options.CHAOS",
+        "TINKER_TIME.pages.CHOOSE_RIDER.options.CHOKING",
+        "TINKER_TIME.pages.CHOOSE_RIDER.options.CURIOUS",
+        "TINKER_TIME.pages.CHOOSE_RIDER.options.ENERGIZED",
+        "TINKER_TIME.pages.CHOOSE_RIDER.options.EXPERTISE",
+        "TINKER_TIME.pages.CHOOSE_RIDER.options.IMPROVEMENT",
+        "TINKER_TIME.pages.CHOOSE_RIDER.options.SAPPING",
+        "TINKER_TIME.pages.CHOOSE_RIDER.options.VIOLENCE",
+        "TINKER_TIME.pages.CHOOSE_RIDER.options.WISDOM",
+        "TINKER_TIME.pages.INITIAL.options.CHOOSE_CARD_TYPE"
+      ]
+    },
+    {
+      "name": "TrashHeap",
+      "id": "EVENT.TRASH_HEAP",
+      "category": "event",
+      "pools": [
+        "act:ACT.UNDERDOCKS",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "TRASH_HEAP.pages.INITIAL.options.DIVE_IN",
+        "TRASH_HEAP.pages.INITIAL.options.GRAB"
+      ]
+    },
+    {
+      "name": "Trial",
+      "id": "EVENT.TRIAL",
+      "category": "event",
+      "pools": [
+        "act:ACT.GLORY",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "TRIAL.pages.INITIAL.options.ACCEPT",
+        "TRIAL.pages.INITIAL.options.REJECT",
+        "TRIAL.pages.MERCHANT.options.GUILTY",
+        "TRIAL.pages.MERCHANT.options.INNOCENT",
+        "TRIAL.pages.NOBLE.options.GUILTY",
+        "TRIAL.pages.NOBLE.options.INNOCENT",
+        "TRIAL.pages.NONDESCRIPT.options.GUILTY",
+        "TRIAL.pages.NONDESCRIPT.options.INNOCENT",
+        "TRIAL.pages.REJECT.options.ACCEPT",
+        "TRIAL.pages.REJECT.options.DOUBLE_DOWN"
+      ]
+    },
+    {
+      "name": "UnrestSite",
+      "id": "EVENT.UNREST_SITE",
+      "category": "event",
+      "pools": [
+        "act:ACT.OVERGROWTH",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "UNREST_SITE.pages.INITIAL.options.KILL",
+        "UNREST_SITE.pages.INITIAL.options.REST"
+      ]
+    },
+    {
+      "name": "Vakuu",
+      "id": "EVENT.VAKUU",
+      "category": "ancient",
+      "pools": [
+        "AllAncients"
+      ],
+      "optionStringLiterals": []
+    },
+    {
+      "name": "WarHistorianRepy",
+      "id": "EVENT.WAR_HISTORIAN_REPY",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "WAR_HISTORIAN_REPY.pages.INITIAL.options.UNLOCK_CAGE",
+        "WAR_HISTORIAN_REPY.pages.INITIAL.options.UNLOCK_CHEST"
+      ]
+    },
+    {
+      "name": "WaterloggedScriptorium",
+      "id": "EVENT.WATERLOGGED_SCRIPTORIUM",
+      "category": "event",
+      "pools": [
+        "act:ACT.UNDERDOCKS",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "WATERLOGGED_SCRIPTORIUM.pages.INITIAL.options.BLOODY_INK",
+        "WATERLOGGED_SCRIPTORIUM.pages.INITIAL.options.PRICKLY_SPONGE",
+        "WATERLOGGED_SCRIPTORIUM.pages.INITIAL.options.PRICKLY_SPONGE_LOCKED",
+        "WATERLOGGED_SCRIPTORIUM.pages.INITIAL.options.TENTACLE_QUILL",
+        "WATERLOGGED_SCRIPTORIUM.pages.INITIAL.options.TENTACLE_QUILL_LOCKED"
+      ]
+    },
+    {
+      "name": "WelcomeToWongos",
+      "id": "EVENT.WELCOME_TO_WONGOS",
+      "category": "event",
+      "pools": [
+        "AllEvents",
+        "AllSharedEvents"
+      ],
+      "optionStringLiterals": [
+        "WELCOME_TO_WONGOS.pages.INITIAL.options.BARGAIN_BIN",
+        "WELCOME_TO_WONGOS.pages.INITIAL.options.BARGAIN_BIN_LOCKED",
+        "WELCOME_TO_WONGOS.pages.INITIAL.options.FEATURED_ITEM",
+        "WELCOME_TO_WONGOS.pages.INITIAL.options.FEATURED_ITEM_LOCKED",
+        "WELCOME_TO_WONGOS.pages.INITIAL.options.LEAVE",
+        "WELCOME_TO_WONGOS.pages.INITIAL.options.MYSTERY_BOX",
+        "WELCOME_TO_WONGOS.pages.INITIAL.options.MYSTERY_BOX_LOCKED"
+      ]
+    },
+    {
+      "name": "Wellspring",
+      "id": "EVENT.WELLSPRING",
+      "category": "event",
+      "pools": [
+        "act:ACT.OVERGROWTH",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "WELLSPRING.pages.INITIAL.options.BATHE",
+        "WELLSPRING.pages.INITIAL.options.BOTTLE"
+      ]
+    },
+    {
+      "name": "WhisperingHollow",
+      "id": "EVENT.WHISPERING_HOLLOW",
+      "category": "event",
+      "pools": [
+        "act:ACT.OVERGROWTH",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "WHISPERING_HOLLOW.pages.INITIAL.options.GOLD",
+        "WHISPERING_HOLLOW.pages.INITIAL.options.HUG"
+      ]
+    },
+    {
+      "name": "WoodCarvings",
+      "id": "EVENT.WOOD_CARVINGS",
+      "category": "event",
+      "pools": [
+        "act:ACT.OVERGROWTH",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "WOOD_CARVINGS.pages.INITIAL.options.BIRD",
+        "WOOD_CARVINGS.pages.INITIAL.options.SNAKE",
+        "WOOD_CARVINGS.pages.INITIAL.options.SNAKE_LOCKED",
+        "WOOD_CARVINGS.pages.INITIAL.options.TORUS"
+      ]
+    },
+    {
+      "name": "ZenWeaver",
+      "id": "EVENT.ZEN_WEAVER",
+      "category": "event",
+      "pools": [
+        "act:ACT.HIVE",
+        "AllEvents"
+      ],
+      "optionStringLiterals": [
+        "ZEN_WEAVER.pages.INITIAL.options.ARACHNID_ACUPUNCTURE",
+        "ZEN_WEAVER.pages.INITIAL.options.BREATHING_TECHNIQUES",
+        "ZEN_WEAVER.pages.INITIAL.options.EMOTIONAL_AWARENESS",
+        "ZEN_WEAVER.pages.INITIAL.options.LOCKED"
+      ]
+    },
+    {
+      "name": "TheArchitect",
+      "id": "EVENT.THE_ARCHITECT",
+      "category": "special",
+      "pools": [],
+      "optionStringLiterals": []
+    }
+  ],
+  "scope": "実v0.111 ModelDb登録65件。出現条件・全分岐は各fixtureの別結果で判定。",
+  "optionKeyScope": "対象DLLメソッドにあるoptions関連の文字列。ロック表示・title/description・数値suffix生成用prefixを含む。合法選択肢数や分岐網羅の母数ではない。動的生成キーは実観測で補う。"
+}

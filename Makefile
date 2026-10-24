@@ -71,3 +71,11 @@ learn-build:
 
 learn-test:
 	$(PYTHON) -B -m unittest discover -s backends/learn_dll/tests
+
+.PHONY: event-fixture-build event-test
+
+event-fixture-build:
+	"$(LEARN_DOTNET)" build backends/learn_dll/fixtures/EventFixture.csproj -c Release -p:BaseOutputPath="$(CURDIR)/local/learn_dll/event-fixture/bin/" -p:BaseIntermediateOutputPath="$(CURDIR)/local/learn_dll/event-fixture/obj/"
+
+event-test:
+	$(PYTHON) -B -m unittest discover -s tests/events -p 'test_*.py'

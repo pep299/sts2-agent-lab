@@ -34,6 +34,23 @@ from backends.common.policy_io import EnvironmentFault,DeclaredLimit
 class Unsupported(EnvironmentFault):pass
 class RequestRejected(ValueError):pass
 
+def event_fixture_parameters(value, *, fixture, save):
+    if value is None:return {}
+    if not fixture or save is not None:
+        raise ValueError('Event fixtures require fixture=True and a fresh run')
+    if not isinstance(value,dict) or not value.keys() <= {'event','hp','max_hp','gold'}:
+        raise ValueError('Unknown event fixture fields')
+    event=value.get('event')
+    if not isinstance(event,str) or re.fullmatch(r'[A-Z0-9_]{1,80}',event) is None:
+        raise ValueError('Invalid fixture event ID')
+    if ('hp' in value) != ('max_hp' in value):
+        raise ValueError('Fixture HP and maximum HP must be specified together')
+    for name in ('hp','max_hp','gold'):
+        if name in value and (type(value[name]) is not int or value[name] < (0 if name=='gold' else 1)):
+            raise ValueError('Invalid fixture integer: '+name)
+    if value.get('hp',0)>value.get('max_hp',0):raise ValueError('Fixture HP exceeds maximum HP')
+    return {'fixture_'+name:amount for name,amount in value.items()}
+
 def validate_mods(executable):
     directory=Path(executable).parent/'mods'
     if directory.is_symlink():raise EnvironmentFault('unqualified_mods:linked mods directory')
@@ -85,7 +102,8 @@ class OwnedProcess:
     def kill(self):self.send_signal(signal.SIGKILL)
 
 class NativeEnvironment:
-    def __init__(self,output,seed,*,save=None,progress=None,fixture=False,rpc_timeout=35,run_seconds=600,max_steps=5000):
+    def __init__(self,output,seed,*,save=None,progress=None,fixture=False,event_fixture=None,rpc_timeout=35,run_seconds=600,max_steps=5000):
+        self.event_fixture=event_fixture_parameters(event_fixture,fixture=fixture,save=save)
         load_config()
         self.output=Path(output).resolve()
         if not self.output.is_relative_to(RESULTS):raise ValueError('Evidence must be inside the dedicated results root')
@@ -111,10 +129,12 @@ class NativeEnvironment:
                      'sourceSaveSha256':sha(self.save) if self.save else None,'continuity':'saved_segment' if save else 'new_run',
                      'fixture':fixture,'expertData':False,'outcome':'running','dataValid':False,'terminal':None,'steps':0,
                      'startedUtc':time.time(),'profileBefore':{str(p.relative_to(self.run_dir/'profile')):sha(p) for p in (self.run_dir/'profile').rglob('*') if p.is_file()}}
+        if event_fixture is not None:self.report['eventFixture']=dict(event_fixture)
         write_json(self.output/'result.json',self.report)
         write_json(self.output/'replay-input.private.json',{'seed':seed,'character':'IRONCLAD','ascension':0,'fixture':fixture,
                     'save':str(self.save) if self.save else None,'sourceSaveSha256':self.report['sourceSaveSha256'],
-                    'profileBefore':self.report['profileBefore'],'runtime':self.manifest,'policyInput':False})
+                    'profileBefore':self.report['profileBefore'],'runtime':self.manifest,
+                    'eventFixture':event_fixture,'policyInput':False})
         shutil.copytree(self.run_dir/'profile',self.output/'profile-before')
         self.app_lock=(LOCK).open('a+')
         fcntl.flock(self.app_lock,fcntl.LOCK_SH|fcntl.LOCK_NB)
@@ -202,7 +222,7 @@ class NativeEnvironment:
             raise EnvironmentFault('loaded_identity_mismatch')
         if Path(hello['user_data']).resolve()!=self.run_dir/'profile':raise EnvironmentFault('profile_isolation_mismatch')
         self.deadline=time.monotonic()+self.run_seconds
-        self.last=self._call('start_run',{'seed':self.seed,'character':'IRONCLAD','ascension':0,'continue':bool(self.save)})
+        self.last=self._call('start_run',{'seed':self.seed,'character':'IRONCLAD','ascension':0,'continue':bool(self.save)}|self.event_fixture)
         self._validate_boundary(self.last)
         self._event('recorder_initialized',{'assemblySha256':GAME_HASH,'recorderRevision':'native-headless-1','observationRevision':'public-state-v3',
                     'backend':'native_headless','expertData':False,'fixture':self.fixture,'continuity':self.report['continuity']})

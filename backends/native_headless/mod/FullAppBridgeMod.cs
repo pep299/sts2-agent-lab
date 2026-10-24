@@ -859,6 +859,14 @@ public static class FullAppBridgeMod
     {
         await WaitHelper.ForNode<Node>(((SceneTree)Engine.GetMainLoop()).Root, "/root/Game/RootSceneContainer/Run/RoomContainer/EventRoom", ct, TimeSpan.FromSeconds(15));
         Node eventRoom = ((SceneTree)Engine.GetMainLoop()).Root.GetNode("/root/Game/RootSceneContainer/Run/RoomContainer/EventRoom");
+        if (EventFixture.Pending)
+        {
+            await WaitHelper.Until(() => UiHelper.FindAll<NEventOptionButton>(eventRoom)
+                .Any(b => b.Option != null && b.IsVisibleInTree() && b.IsEnabled && !b.Option.IsLocked),
+                ct, TimeSpan.FromSeconds(15), "Initial event is not ready for fixture replacement");
+            await EventFixture.EnterAsync();
+            eventRoom = ((SceneTree)Engine.GetMainLoop()).Root.GetNode("/root/Game/RootSceneContainer/Run/RoomContainer/EventRoom");
+        }
 
         while (GodotObject.IsInstanceValid(eventRoom) && eventRoom.IsInsideTree())
         {
@@ -922,7 +930,8 @@ public static class FullAppBridgeMod
                 throw new InvalidOperationException("Event option changed before execution");
 
             NEventOptionButton chosenBtn = optionButtons[choiceIdx];
-            bool isProceed = chosenBtn.Option.IsProceed;
+            EventOption chosenOption = chosenBtn.Option;
+            bool isProceed = chosenOption.IsProceed;
 
             var eventManager = RunManager.Instance ?? throw new InvalidOperationException("Missing event run manager");
             Task eventEffect = await NativeEventCompletion.ClickAndCapture(chosenBtn, ct);
@@ -939,6 +948,7 @@ public static class FullAppBridgeMod
                 await eventEffect;
                 await eventManager.EventSynchronizer.AwaitPendingOptionTasks();
             }
+            await NativeEventCompletion.CompleteLethalProceedAsync(chosenOption, ct);
             // Native effects can finish before the room publishes its next controls.
             var tree = (SceneTree)Engine.GetMainLoop();
             for (int frame = 0; frame < 2; frame++)

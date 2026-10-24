@@ -131,6 +131,7 @@ public static class FullAppBridgeServer
                         throw new NotSupportedException("Only solo Ironclad A0 is qualified");
                     RequestedAscension = 0;
                     ContinueRequested = Text(parameters, "continue").Equals("true", StringComparison.OrdinalIgnoreCase);
+                    EventFixture.Configure(parameters, ContinueRequested);
                     nextBoundary = Completion<object>(); ready = nextBoundary.Task;
                     IsRunStarted = true; inFlight = true;
                 }

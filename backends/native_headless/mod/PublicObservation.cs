@@ -104,7 +104,8 @@ public static class PublicObservation
                 index++;
             }
         }
-        var selection = context is CardSelectContext c ? new { min = c.MinSelect, max = c.MaxSelect, purpose = c.Purpose,
+        var selection = context is CardSelectContext c ? new { min = c.MinSelect, max = c.MaxSelect,
+            purpose = c.Purpose is "FromSimpleGridForRewards" or "FromDeckGeneric" ? null : c.Purpose,
             cards = c.Cards.Select((card, index) => new { index, cardDetails = Card(card) }).ToArray() } : null;
         var hand = active ? PileType.Hand.GetPile(player).Cards.Select((card, index) => (object)new { index, id = PublicData.Id(card), title = PublicData.Title(card),
             cost = card.EnergyCost.CostsX ? "X" : card.EnergyCost.GetResolved().ToString(), targetType = card.TargetType.ToString(), cardDetails = Card(card), canPlay = card.CanPlay() }).ToArray() : Array.Empty<object>();
