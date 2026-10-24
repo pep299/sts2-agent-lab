@@ -2,14 +2,13 @@
 from pathlib import Path
 import argparse
 import json
-import os
-import selectors
-import subprocess
-import time
+import sys
 import traceback
+from configuration import REPO
 from runtime import NativeEnvironment,EnvironmentFault,DeclaredLimit,Unsupported,RequestRejected,write_json,RESULTS
 
-class PolicyFault(RuntimeError):pass
+sys.path.insert(0,str(Path(__file__).resolve().parents[3]))
+from backends.common.policy_io import JsonLinePolicy,PolicyFault
 
 def summarize(runs,requested):
     completed=[r for r in runs if r['outcome']=='completed' and r['dataValid']]
@@ -72,76 +71,24 @@ def run_batch(specs,output,choose,*,fault_hook=None):
     finally:repair.close()
     return summarize(runs,len(specs))
 
-class JsonLinePolicy:
-    def __init__(self,command,output,timeout=30):
-        self.stderr=Path(output).open('x');self.timeout=timeout;self.command=command;self.process=None
-        try:self._start()
-        except BaseException:self.stderr.close();raise
-
-    def _start(self):
-        if self.stderr.closed:raise PolicyFault('policy_closed')
-        self.process=subprocess.Popen(self.command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=self.stderr,bufsize=0)
-        os.set_blocking(self.process.stdin.fileno(),False)
-        os.set_blocking(self.process.stdout.fileno(),False)
-
-    def __call__(self,boundary,*,run_deadline=None):
-        if self.process is None:self._start()
-        try:return self._exchange(boundary,run_deadline)
-        except BaseException:
-            # 遅延応答を次ランで受け取らないよう、失敗した通信路は破棄する。
-            self._stop()
-            raise
-
-    def _exchange(self,boundary,run_deadline):
-        deadline=time.monotonic()+self.timeout
-        if run_deadline is not None:deadline=min(deadline,run_deadline)
-        payload=memoryview((json.dumps(boundary,ensure_ascii=False)+'\n').encode())
-        if len(payload)>32*1024*1024:raise PolicyFault('policy_input_too_large')
-        def ready(selector):
-            remaining=deadline-time.monotonic()
-            if remaining<=0 or not selector.select(remaining):
-                if run_deadline is not None and time.monotonic()>=run_deadline:raise DeclaredLimit('declared_wall_time_limit')
-                raise PolicyFault('policy_response_timeout')
-        with selectors.DefaultSelector() as selector:
-            selector.register(self.process.stdin,selectors.EVENT_WRITE)
-            while payload:
-                ready(selector)
-                try:written=os.write(self.process.stdin.fileno(),payload)
-                except BlockingIOError:continue
-                except BrokenPipeError as error:raise PolicyFault('policy_input_closed') from error
-                payload=payload[written:]
-            selector.unregister(self.process.stdin)
-            selector.register(self.process.stdout,selectors.EVENT_READ)
-            response=bytearray()
-            while b'\n' not in response:
-                ready(selector)
-                try:chunk=os.read(self.process.stdout.fileno(),65536)
-                except BlockingIOError:continue
-                if not chunk:raise PolicyFault('policy_process_exit:'+str(self.process.poll()))
-                response.extend(chunk)
-                if len(response)>1024*1024:raise PolicyFault('policy_response_too_large')
-        line,extra=response.split(b'\n',1)
-        if extra.strip():raise PolicyFault('policy_unsolicited_output')
-        try:decision=json.loads(line)
-        except (ValueError,UnicodeDecodeError) as error:raise PolicyFault('policy_response_not_json') from error
-        if not isinstance(decision,dict) or not isinstance(decision.get('action_id'),str):
-            raise PolicyFault('policy_response_missing_action_id')
-        return decision
-    def _stop(self):
-        if self.process is None:return
-        if self.process.poll() is None:
-            self.process.terminate()
-            try:self.process.wait(timeout=3)
-            except subprocess.TimeoutExpired:self.process.kill();self.process.wait(timeout=3)
-        self.process.stdin.close();self.process.stdout.close();self.process=None
-
-    def close(self):
-        self._stop();self.stderr.close()
-
-if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--plan',type=Path,required=True);parser.add_argument('--output',type=Path,required=True)
-    parser.add_argument('--policy-command',nargs='+',required=True);args=parser.parse_args()
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--plan',type=Path,required=True)
+    parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--policy-cwd',type=Path,default=REPO,
+                        help='方策プロセスの作業ディレクトリ。既定はこのリポジトリ')
+    parser.add_argument('--policy-command',nargs=argparse.REMAINDER,required=True,
+                        help='最後に指定する。以降を方策プロセスのコマンドとして渡す')
+    args=parser.parse_args()
+    if not args.policy_command:parser.error('方策コマンドを指定してください')
     specs=json.loads(args.plan.read_text())
-    policy=JsonLinePolicy(args.policy_command,args.output.with_suffix('.policy-stderr.log'))
-    try:print(json.dumps(run_batch(specs,args.output,policy),ensure_ascii=False))
+    output=args.output.resolve()
+    if not output.is_relative_to(RESULTS) or output.exists():
+        parser.error('出力はnativeのresults内に、存在しないパスを指定してください')
+    output.parent.mkdir(parents=True,exist_ok=True)
+    policy=JsonLinePolicy(args.policy_command,output.with_suffix('.policy-stderr.log'),cwd=args.policy_cwd)
+    try:print(json.dumps(run_batch(specs,output,policy),ensure_ascii=False))
     finally:policy.close()
+
+
+if __name__=='__main__':main()

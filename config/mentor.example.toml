@@ -1,0 +1,12 @@
+[paths]
+extension = "local/mentor/mentor_rs.abi3.so"
+model = "external/spire-mentor/sts2-pycli/data/ppo/ppo_fullrun_ironclad_plr_it550_v0111vocab.onnx"
+
+[identity]
+build_git = "f79727f1fd49a8e22e8403084b1a82210c82b2ae"
+model_sha256 = "b8bb1c85a497598bfa3430ad14b9bf5ca2335c7f3cf4b81101527098ceaa76c8"
+
+[search]
+sims = 1000
+boss_sims = 4000
+threads = 1

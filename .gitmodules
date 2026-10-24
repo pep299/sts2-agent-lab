@@ -1,3 +1,6 @@
 [submodule "external/sts2-sim"]
-    path = external/sts2-sim
-    url = https://github.com/iRyougi/sts2-sim.git
+	path = external/sts2-sim
+	url = https://github.com/iRyougi/sts2-sim.git
+[submodule "external/spire-mentor"]
+	path = external/spire-mentor
+	url = https://github.com/tfriedel/spire-mentor.git

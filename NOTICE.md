@@ -10,3 +10,5 @@ nativeブリッジと共有投影は**独自保守**とし、上流HEADへの定
 ゲーム対応更新や不具合修正では、上流差分から原因に関係する変更だけを選び、この実行器の回帰試験を通して採用する。採用元のcommitは取り込みcommitに記録する。通信型・描画抑制を含めmod全体がこちらの保守対象となる。
 
 `external/sts2-sim`は独立したsubmoduleで、そちらのライセンスに従う。ゲーム本体・資源・保存データはこのrepoのMIT許諾対象ではない。本プロジェクトはMega Critの公式製品・提携プロジェクトではない。
+
+`external/spire-mentor`は[Spire Mentor](https://github.com/tfriedel/spire-mentor)の固定commitを参照するsubmodule。ソース・配布学習済みネットワークのMIT許諾は同submoduleの`LICENSE`・`NOTICE`に従う。`agents/mentor`はそのRust推論API・モデルを利用する公開観測アダプター。`agents/mentor/engine`は上流のPython APIを組み込み、カード処理の登録APIでWishを差し替える。Wish実装は上流からの派生で同じMIT許諾に従う。`make mentor-patch`は、トップレベル自動使用ループの選択再開と回帰試験の`autoplay-resume.patch`、上流をRustライブラリだけにして不要なPython拡張の生成を省く`library-only.patch`を適用する。更新時はcommit・patch・モデルSHA・回帰試験を揃えて変更する。
