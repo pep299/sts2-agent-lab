@@ -56,3 +56,18 @@ mentor-test:
 
 sts2-test:
 	$(PYTHON) -B -m unittest discover -s sts2/tests
+
+LEARN_DOTNET ?= dotnet
+LEARN_GAME_LIBS ?=
+
+.PHONY: learn-deps learn-build learn-test
+
+learn-deps:
+	git submodule update --init --recursive external/learn-the-spire
+
+learn-build:
+	@test -n "$(LEARN_GAME_LIBS)" || (echo 'LEARN_GAME_LIBSに既存の管理DLLディレクトリを指定してください'; exit 1)
+	cd external/learn-the-spire && "$(LEARN_DOTNET)" build addons/public-observation/public-observation.sln -c Release -p:GameLibDir="$(abspath $(LEARN_GAME_LIBS))"
+
+learn-test:
+	$(PYTHON) -B -m unittest discover -s backends/learn_dll/tests

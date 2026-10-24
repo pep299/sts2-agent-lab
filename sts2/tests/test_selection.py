@@ -19,6 +19,8 @@ class SelectionKnowledge(unittest.TestCase):
             ('TRI_BOOMERANG', None, 'enchant', 'INSTINCT'),
             (None, 'AROMA_OF_CHAOS.pages.INITIAL.options.LET_GO', 'transform', None),
             (None, 'AROMA_OF_CHAOS.pages.INITIAL.options.MAINTAIN_CONTROL', 'upgrade', None),
+            (None, 'AMALGAMATOR.pages.INITIAL.options.COMBINE_STRIKES', 'remove', None),
+            (None, 'AMALGAMATOR.pages.INITIAL.options.COMBINE_DEFENDS', 'remove', None),
             (None, 'SELF_HELP_BOOK.pages.INITIAL.options.READ_ENTIRE_BOOK', 'enchant', 'SWIFT')]
         for relic, key, purpose, enchantment in cases:
             with self.subTest(relic=relic, key=key):

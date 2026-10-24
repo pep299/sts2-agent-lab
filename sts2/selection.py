@@ -55,6 +55,8 @@ class SelectionContext:
             key = option.get('text_key')
             purposes = {'AROMA_OF_CHAOS.pages.INITIAL.options.LET_GO': 'transform',
                         'AROMA_OF_CHAOS.pages.INITIAL.options.MAINTAIN_CONTROL': 'upgrade',
+                        'AMALGAMATOR.pages.INITIAL.options.COMBINE_STRIKES': 'remove',
+                        'AMALGAMATOR.pages.INITIAL.options.COMBINE_DEFENDS': 'remove',
                         'WOOD_CARVINGS.pages.INITIAL.options.BIRD': 'transform',
                         'WOOD_CARVINGS.pages.INITIAL.options.TORUS': 'transform',
                         'SYMBIOTE.pages.INITIAL.options.KILL_WITH_FIRE': 'transform',
