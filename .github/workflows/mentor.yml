@@ -3,11 +3,12 @@ name: Mentor
 on: push
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: mentor-artifact
+  cancel-in-progress: false
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   policy:
@@ -46,9 +47,21 @@ jobs:
           cp external/spire-mentor/NOTICE "$package/NOTICE"
           cp external/spire-mentor/sts2-rs/LICENSE "$package/LICENSE-rust"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        if: github.ref == 'refs/heads/main'
+        id: upload
         with:
           name: mentor-chat
           path: ${{ runner.temp }}/mentor-chat/
           if-no-files-found: error
           compression-level: 0
+      - name: Delete previous artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP_ID: ${{ steps.upload.outputs.artifact-id }}
+        run: |
+          gh api \
+            --paginate \
+            --jq ".artifacts[].id | select(. != ${KEEP_ID})" \
+            "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=mentor-chat&per_page=100" |
+            xargs -r -I '{}' gh api \
+              --method DELETE \
+              "repos/${GITHUB_REPOSITORY}/actions/artifacts/{}"
