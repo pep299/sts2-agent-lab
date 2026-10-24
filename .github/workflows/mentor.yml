@@ -36,3 +36,20 @@ jobs:
           CARGO_PROFILE_RELEASE_OPT_LEVEL: '1'
         run: make mentor-build
       - run: make mentor-test
+      - name: Prepare Mentor for Chat
+        run: |
+          package="$RUNNER_TEMP/mentor-chat"
+          mkdir -p "$package/models"
+          cp local/mentor/mentor_rs.abi3.so "$package/"
+          cp external/spire-mentor/sts2-pycli/data/ppo/ppo_fullrun_*_v0111vocab.onnx "$package/models/"
+          cp scripts/mentor-eval.py "$package/"
+          cp external/spire-mentor/LICENSE "$package/LICENSE"
+          cp external/spire-mentor/NOTICE "$package/NOTICE"
+          cp external/spire-mentor/sts2-rs/LICENSE "$package/LICENSE-rust"
+          git rev-parse HEAD:external/spire-mentor > "$package/mentor-commit"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: mentor-chat
+          path: ${{ runner.temp }}/mentor-chat/
+          compression-level: 0
+          retention-days: 7
