@@ -79,6 +79,7 @@ public static class FullAppBridgeMod
         SpecialChoices.Apply(harmony);
         NativeEventCompletion.Apply(harmony);
         NativeRunOutcome.Apply(harmony);
+        FixtureActions.Apply(harmony);
 
         TryPatchPostfix(harmony, typeof(NGame), "LaunchMainMenu", nameof(OnMainMenuLaunched));
         TryPatchPrefix(harmony, typeof(StartRunLobby), "BeginRunForAllPlayersIfAllReady", nameof(OnBeginRunForAllPlayers));

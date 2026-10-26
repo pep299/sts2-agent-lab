@@ -101,6 +101,24 @@ class LearnEnvironmentContract(unittest.TestCase):
             LearnEnvironment(self.root / 'missing-root', sys.executable, output)
         self.assertFalse(output.exists())
 
+    def test_missing_crystal_assets_does_not_start_host_or_create_output(self):
+        output = self.root / 'missing-assets-output'
+        with self.assertRaises(FileNotFoundError):
+            LearnEnvironment(self.root, sys.executable, output, crystal_assets=self.root / 'missing-assets')
+        self.assertFalse(output.exists())
+
+    def test_crystal_assets_are_passed_as_explicit_host_argument(self):
+        assets = self.root / 'crystal-assets'
+        assets.mkdir()
+        host = self.root / 'addons/public-observation/Sts2DllRecorder/bin/Release/net9.0/Sts2DllRecorder.dll'
+        host.write_text(HOST.replace("'received': request", "'received': request, 'hostArguments': sys.argv"))
+        env = LearnEnvironment(self.root, sys.executable, self.root / 'assets-output', crystal_assets=assets)
+        try:
+            args = env.reset('EXAMPLE')['observation']['hostArguments']
+            self.assertEqual(args[args.index('--crystal-assets') + 1], str(assets.resolve()))
+        finally:
+            env.close()
+
 
 if __name__ == '__main__':
     unittest.main()

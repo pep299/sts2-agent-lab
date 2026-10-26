@@ -15,6 +15,9 @@ RELIC_SELECTIONS = {
     'PAELS_GROWTH': ('enchant', 'CLONE'), 'CLAWS': ('transform', None),
     'SEA_GLASS': ('grant', None), 'HEFTY_TABLET': ('grant', None),
     'LEAD_PAPERWEIGHT': ('grant', None),
+    'DOLLYS_MIRROR': ('copy', None), 'GNARLED_HAMMER': ('enchant', 'SHARP'),
+    'KIFUDA': ('enchant', 'ADROIT'), 'PUNCH_DAGGER': ('enchant', 'MOMENTUM'),
+    'ROYAL_STAMP': ('enchant', 'ROYALLY_APPROVED'),
 }
 
 

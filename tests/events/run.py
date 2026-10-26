@@ -80,8 +80,10 @@ class LearnFixture(LearnEnvironment):
         self.host = args.fixture_host.resolve()
         self.stderr = (output / 'host-stderr.log').open('x')
         try:
-            self.process = subprocess.Popen([str(args.dotnet), str(self.host), '--host-dir', str(args.learn_host_dir),
-                '--log', str(output / 'events.jsonl')], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            command = [str(args.dotnet), str(self.host), '--host-dir', str(args.learn_host_dir), '--log', str(output / 'events.jsonl')]
+            if getattr(args, 'crystal_assets', None) is not None:
+                command += ['--crystal-assets', str(args.crystal_assets.resolve())]
+            self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=self.stderr, bufsize=0, cwd=REPO)
         except BaseException:
             self.stderr.close()
@@ -293,6 +295,7 @@ def main():
     parser.add_argument('--dotnet', type=Path)
     parser.add_argument('--fixture-host', type=Path, default=REPO / 'local/learn_dll/event-fixture/bin/Release/net9.0/EventFixture.dll')
     parser.add_argument('--learn-host-dir', type=Path)
+    parser.add_argument('--crystal-assets', type=Path)
     parser.add_argument('--policy-config', type=Path, default=default_config())
     parser.add_argument('--fixture', type=Path, help='追加のact/potions/add_cards/relics/deckを記載したJSON')
     parser.add_argument('--include-special', action='store_true')

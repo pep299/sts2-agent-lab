@@ -117,6 +117,9 @@ public static class PublicObservation
             potions = player.Potions.Select(p => PublicData.Id(p)).ToArray(), relics = player.Relics.Select(PublicData.Id).ToArray(), relicDetails = player.Relics.Select(PublicData.Relic).ToArray(),
             deckCards = player.Deck.Cards.OrderBy(Cards.SortKey, StringComparer.Ordinal).Select((card, index) => new { index, cardDetails = Card(card) }).ToArray(),
             map = PublicData.Map(run), combat = combatView, room = new { type = run.CurrentRoom?.GetType().Name, id = P(run.CurrentRoom, "ModelId")?.ToString() } };
+        var unavailable = new Dictionary<string, string> { ["intentIcons"] = "headless renderer", ["renderedCardText"] = "template and existing dynamic variables only" };
+        if (context is SpecialChoiceContext { CrystalSphereVisualsUnavailable: { } visualError })
+            unavailable["crystalSphereVisualItems"] = visualError;
         return new { state = new { phase = Phase(raw.Phase), status, hand, enemies = active ? Enemies(CombatManager.Instance!.DebugOnlyGetState()!) : Array.Empty<object>(), offers,
                 shop = raw.Phase == "shop" && context is MerchantChoiceContext merchant ? new { inventoryOpen = merchant.InventoryOpen } : null,
                 selection, eventId = raw.Phase == "event" ? raw.Room?.Details.GetValueOrDefault("event_id") : null,
@@ -135,8 +138,7 @@ public static class PublicObservation
             capabilities = new { backend = "native_headless", gameVersion = "v0.111.0", observationRevision = "public-state-v3", renderedCardText = false,
                 diagnosticFixture = FixtureActions.Enabled, diagnosticFixtureResult = FixtureActions.Enabled ? FixtureActions.LastResult : null,
                 explicitMultiCardIndices = true, supportedCharacters = new[] { "IRONCLAD" }, supportedAscensions = new[] { 0 },
-                unavailable = new Dictionary<string, string> { ["intentIcons"] = "headless renderer", ["renderedCardText"] = "template and existing dynamic variables only",
-                    ["crystalSpherePartialArtwork"] = "Cleared coordinates only; item artwork recognition is not projected" } } };
+                unavailable } };
     }
     private static object[] EventOptions(object? descriptions)
     {

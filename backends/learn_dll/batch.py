@@ -13,7 +13,7 @@ from backends.learn_dll.learn_environment import LearnEnvironment
 REPO = Path(__file__).resolve().parents[2]
 
 
-def run_episode(root, dotnet, output, seed, policy_command, *, seconds=900, max_steps=5000, policy_cwd=REPO):
+def run_episode(root, dotnet, output, seed, policy_command, *, seconds=900, max_steps=5000, policy_cwd=REPO, crystal_assets=None):
     if min(seconds, max_steps) <= 0:
         raise ValueError('時間・操作上限は正の整数を指定')
     root = Path(root).resolve()
@@ -24,7 +24,8 @@ def run_episode(root, dotnet, output, seed, policy_command, *, seconds=900, max_
     output = output.resolve()
     if not output.is_relative_to(REPO / 'local/learn_dll/results'):
         raise ValueError('出力はlocal/learn_dll/results内に指定')
-    env = LearnEnvironment(root, dotnet, output)
+    environment_options = {'crystal_assets': crystal_assets} if crystal_assets is not None else {}
+    env = LearnEnvironment(root, dotnet, output, **environment_options)
     policy = None
     report = {'backend': 'learn_dll', 'outcome': 'interrupted', 'terminal': None,
               'dataValid': False, 'expertData': False, 'steps': 0,
@@ -37,6 +38,8 @@ def run_episode(root, dotnet, output, seed, policy_command, *, seconds=900, max_
             'actGeneration': 'seeded_all_unlocked', 'policyCommand': policy_command,
             'learnCommit': source_commit,
             'hostSha256': hashlib.sha256(env.host.read_bytes()).hexdigest(),
+            'crystalAssetsDirectory': str(Path(crystal_assets).resolve()) if crystal_assets is not None else None,
+            'crystalAssetsSha256': hashlib.sha256((Path(crystal_assets) / 'catalog.json').read_bytes()).hexdigest() if crystal_assets is not None else None,
             'seconds': seconds, 'maxSteps': max_steps,
             'environmentSourceSha256': {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
                 for path in [Path(__file__), Path(__file__).with_name('observation.py'),
@@ -109,6 +112,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--learn-root', type=Path, default=REPO / 'external/learn-the-spire')
     parser.add_argument('--dotnet', type=Path, required=True)
+    parser.add_argument('--crystal-assets', type=Path, help='同じゲーム版から抽出した公開画像資産ディレクトリ')
     parser.add_argument('--seed', required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--seconds', type=int, default=900)
@@ -120,7 +124,8 @@ def main():
     if not args.policy_command:
         parser.error('--policy-command以降に方策のコマンドを指定')
     report = run_episode(args.learn_root, args.dotnet, args.output, args.seed, args.policy_command,
-                         seconds=args.seconds, max_steps=args.max_steps, policy_cwd=args.policy_cwd)
+                         seconds=args.seconds, max_steps=args.max_steps, policy_cwd=args.policy_cwd,
+                         crystal_assets=args.crystal_assets)
     print(json.dumps(report, ensure_ascii=False))
     raise SystemExit(1 if report['outcome'] == 'fault' else 0)
 

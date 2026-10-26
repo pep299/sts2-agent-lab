@@ -13,8 +13,9 @@ catch (Exception error) { Console.Error.WriteLine(error); return 1; }
 
 static int Serve(string[] args, TextWriter output)
 {
-    if (args.Length != 4 || args[0] != "--host-dir" || args[2] != "--log")
-        throw new ArgumentException("--host-dir <既存Sts2DllRecorderの出力先> --log <新しいJSONL>");
+    if (args.Length is not (4 or 6) || args[0] != "--host-dir" || args[2] != "--log"
+        || args.Length == 6 && args[4] != "--crystal-assets")
+        throw new ArgumentException("--host-dir <既存Sts2DllRecorderの出力先> --log <新しいJSONL> [--crystal-assets <canonical RGBA directory>]");
     string directory = Path.GetFullPath(args[1]);
     string log = Path.GetFullPath(args[3]);
     string gamePath = Path.Combine(directory, "sts2.dll");
@@ -34,6 +35,7 @@ static int Serve(string[] args, TextWriter output)
     harness.GetType("Lts2.Harness.GameRuntime", true)!.GetMethod("EnsureInitialized")!.Invoke(null, null);
     Directory.CreateDirectory(Path.GetDirectoryName(log)!);
     using var recorder = (IDisposable)Activator.CreateInstance(recorderAssembly.GetType("DllRecorder", true)!, log)!;
+    if (args.Length == 6) Call(recorder, "ConfigureCrystalAssets", Path.GetFullPath(args[5]));
     var json = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     var db = game.GetType("MegaCrit.Sts2.Core.Models.ModelDb", true)!;
     var registered = Events(db);
@@ -60,10 +62,17 @@ static int Serve(string[] args, TextWriter output)
                 output.WriteLine(JsonSerializer.Serialize(new { fixture = true, expertData = false, gameHash, events = inventory }, json));
                 continue;
             }
-            if (name == "reset_event")
+            if (name is "reset_event" or "reset_shop")
             {
-                ValidateFields(command, "cmd", "eventName", "seed", "hp", "maxHp", "gold", "act", "potions", "add_cards", "relics", "deck");
-                string eventName = RequiredString(command, "eventName");
+                bool shopFixture = name == "reset_shop";
+                if (shopFixture)
+                    ValidateFields(command, "cmd", "shop_relic", "seed", "hp", "maxHp", "gold", "act", "potions", "add_cards", "relics", "deck");
+                else
+                    ValidateFields(command, "cmd", "eventName", "seed", "hp", "maxHp", "gold", "act", "potions", "add_cards", "relics", "deck");
+                string? shopRelic = shopFixture ? RequiredString(command, "shop_relic") : null;
+                if (shopFixture && shopRelic is not ("DOLLYS_MIRROR" or "GNARLED_HAMMER" or "KIFUDA" or "PUNCH_DAGGER" or "ROYAL_STAMP"))
+                    throw new ArgumentException("shop_relicは取得時選択5種のみ対応");
+                string eventName = shopFixture ? "Neow" : RequiredString(command, "eventName");
                 string seed = RequiredString(command, "seed");
                 var candidates = registered.Keys.AsEnumerable();
                 if (eventName is "TheArchitect" or "EVENT.THE_ARCHITECT" or "THE_ARCHITECT")
@@ -128,20 +137,35 @@ static int Serve(string[] args, TextWriter output)
                     deck = Items(Get(Get(player, "Deck"), "Cards")).Select(c => Get(c, "Id").ToString()).ToArray(),
                     relics = Items(Get(player, "Relics")).Select(r => Get(r, "Id").ToString()).ToArray(),
                     potions = ((IEnumerable)Get(player, "PotionSlots")).Cast<object?>().Select(p => p == null ? null : Get(p, "Id").ToString()).ToArray() };
-                if (matching[0].GetType().Name != "Neow") Call(host, "EnterEventDebug", matching[0]);
+                object? shopInitialization = null;
+                if (shopFixture)
+                {
+                    var roomType = Enum.Parse(game.GetType("MegaCrit.Sts2.Core.Rooms.RoomType", true)!, "Shop");
+                    var pointType = Enum.Parse(game.GetType("MegaCrit.Sts2.Core.Map.MapPointType", true)!, "Shop");
+                    Await(Call(manager, "EnterRoomDebug", roomType, pointType, null!, false));
+                    var inventory = Get(host, "CurrentShopInventory");
+                    var slot = Items(Get(inventory, "RelicEntries")).First();
+                    Call(slot, "SetModel", Call(Model(db, "AllRelics", shopRelic!), "ToMutable"));
+                    if (Get(Call(host, "GetState"), "Phase").ToString() != "Shop")
+                        throw new InvalidOperationException("通常ショップへ入場できていない");
+                    shopInitialization = new { relicId = Get(Get(slot, "Model"), "Id").ToString(),
+                        cost = Get(slot, "Cost"), isStocked = Get(slot, "IsStocked"),
+                        roomType = Get(run, "CurrentRoom").GetType().Name };
+                }
+                else if (matching[0].GetType().Name != "Neow") Call(host, "EnterEventDebug", matching[0]);
                 entered = true;
-                Write(recorder, "event_fixture_initialized", new
+                Write(recorder, shopFixture ? "shop_fixture_initialized" : "event_fixture_initialized", new
                 {
                     fixture = true, expertData = false, eventName,
-                    requested = new { hp, maxHp, gold, act, potions, add_cards = added, relics, deck },
-                    allowedBeforeEntry, beforeEntry,
+                    requested = new { hp, maxHp, gold, act, potions, add_cards = added, relics, deck, shop_relic = shopRelic },
+                    allowedBeforeEntry, beforeEntry, shopInitialization,
                     actual = new { hp = Get(creature, "CurrentHp"), maxHp = Get(creature, "MaxHp"), gold = Get(player, "Gold") }
                 });
             }
             else if (name == "step")
             {
                 ValidateFields(command, "cmd", "index", "cardIndices");
-                if (!entered) throw new InvalidOperationException("reset_eventが必要");
+                if (!entered) throw new InvalidOperationException("reset_eventまたはreset_shopが必要");
                 bool hasIndex = command.TryGetProperty("index", out var index);
                 bool hasCards = command.TryGetProperty("cardIndices", out var cards);
                 if (hasIndex == hasCards) throw new ArgumentException("indexかcardIndicesの一方を指定");
@@ -151,7 +175,7 @@ static int Serve(string[] args, TextWriter output)
             else if (name == "observe")
             {
                 ValidateFields(command, "cmd");
-                if (!entered) throw new InvalidOperationException("reset_eventが必要");
+                if (!entered) throw new InvalidOperationException("reset_eventまたはreset_shopが必要");
             }
             else throw new ArgumentException("未対応のcmd: " + name);
             var observation = JsonSerializer.SerializeToNode(Call(recorder, "Observe"), json)!.AsObject();
@@ -196,7 +220,8 @@ static object Invoke(Type type, object? instance, BindingFlags binding, string n
     var method = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | binding)
         .Single(m => m.Name == name && !m.ContainsGenericParameters
             && m.GetParameters().Count(p => !p.IsOptional) <= args.Length && m.GetParameters().Length >= args.Length
-            && m.GetParameters().Take(args.Length).Select((p, i) => p.ParameterType.IsInstanceOfType(args[i])
+            && m.GetParameters().Take(args.Length).Select((p, i) => args[i] is null && !p.ParameterType.IsValueType
+                || p.ParameterType.IsInstanceOfType(args[i])
                 || args[i] is IConvertible && typeof(IConvertible).IsAssignableFrom(p.ParameterType)).All(ok => ok));
     object?[] supplied = args.Concat(method.GetParameters().Skip(args.Length).Select(p => p.DefaultValue!)).ToArray();
     supplied = supplied.Select((argument, index) => Coerce(argument, method.GetParameters()[index].ParameterType)).ToArray();

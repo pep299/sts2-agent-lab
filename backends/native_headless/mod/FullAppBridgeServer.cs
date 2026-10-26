@@ -225,7 +225,7 @@ public static class FullAppBridgeServer
             if (chosen.StartsWith("fixture:", StringComparison.Ordinal))
             {
                 await FixtureActions.Apply(chosen);
-                if (chosen == "fixture:merchant") return "event_room_changed";
+                if (chosen == "fixture:merchant" || chosen.StartsWith("fixture:merchant:", StringComparison.Ordinal)) return "event_room_changed";
                 continue;
             }
             if (PotionActions.IsPotion(chosen))

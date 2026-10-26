@@ -1,5 +1,6 @@
 from contextlib import redirect_stdout
 from io import StringIO
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -60,3 +61,13 @@ class BackendBatchContract(unittest.TestCase):
         command = f'import os; assert os.getcwd() == {str(REPO)!r}\n' + POLICY
         report = self.run_policy([sys.executable, '-u', '-c', command], 'COMPLETE')
         self.assertEqual(report['terminal'], 'victory')
+
+    def test_replay_pins_the_crystal_catalog_content(self):
+        assets = self.root / 'crystal-assets'
+        assets.mkdir()
+        content = b'{"fixture": "public-image-dictionary"}'
+        (assets / 'catalog.json').write_bytes(content)
+        report = self.run_policy([sys.executable, '-u', '-c', POLICY], 'COMPLETE', crystal_assets=assets)
+        replay = json.loads((Path(self.output_parent.name) / 'run/replay-input.private.json').read_text())
+        self.assertEqual(report['terminal'], 'victory')
+        self.assertEqual(replay['crystalAssetsSha256'], hashlib.sha256(content).hexdigest())

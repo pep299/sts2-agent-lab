@@ -62,6 +62,30 @@ class AncientSelection(unittest.TestCase):
         with self.assertRaisesRegex(Unsupported, '確率'):
             self.policy([float('nan'), .2, .2, .6]).choose(self.selection('grant', 0, 2))
 
+    def test_shop_copy_scores_grants_and_keeps_copy_intent(self):
+        obs = self.selection('copy', 1, 1, 'DOLLYS_MIRROR')
+        response, info = self.policy().choose(obs)
+        self.assertEqual(len(response['indices']), 1)
+        self.assertEqual(info['source'], 'ppo_copy_via_grant_proxy')
+        self.assertEqual(info['purpose'], 'copy')
+
+    def test_optional_shop_enchants_keep_name_and_choose_legal_maximum(self):
+        runtime = self.runtime
+        for parent, enchantment in [('GNARLED_HAMMER', 'SHARP'), ('KIFUDA', 'ADROIT')]:
+            with self.subTest(parent=parent):
+                obs = self.selection('enchant', 0, 2, parent)
+                obs['state']['selection']['enchantment'] = enchantment
+                policy = self.policy()
+                class Net:
+                    def distribution(self, packet, actions, features):
+                        self.pending = packet['pending_enchantment']
+                        return runtime.net.distribution(packet, actions, features)
+                policy.net = Net()
+                response, info = policy.choose(obs)
+                self.assertEqual(len(response['indices']), 2)
+                self.assertEqual(policy.net.pending, enchantment)
+                self.assertEqual(info['count_rule'], 'fixed_maximum_for_' + parent.lower())
+
     def test_bundle_aggregates_all_cards_and_matches_explicit_index(self):
         obs = observation('bundle_selection')
         obs['state']['bundles'] = [[card('BASH'), card('STRIKE_IRONCLAD')],

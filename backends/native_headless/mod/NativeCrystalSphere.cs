@@ -65,12 +65,18 @@ internal static class NativeCrystalSphere
                     actions.Add(new LegalActionDto { ActionId = "crystal_sphere_tool:" + tool, ActionType = "crystal_sphere_tool",
                         Description = "Select " + tool + " divination", Metadata = new() { ["tool"] = tool } });
             if (available.Count == 0) throw new NotSupportedException("Crystal Sphere has divinations but no visible hidden cell");
-            var context = new SpecialChoiceContext { Actions = actions, CrystalSphere = new {
+            var visuals = CrystalSphereProjection.Project(game, NativeCrystalAssets.Value);
+            var context = new SpecialChoiceContext { Actions = actions, CrystalSphereVisualsUnavailable = visuals.Unavailable, CrystalSphere = new {
                 width = game.GridSize.X, height = game.GridSize.Y, divinationsLeft = game.DivinationCount,
                 tool = game.CrystalSphereTool.ToString(),
                 hiddenCells = cells.Where(c => c.Entity.IsHidden).Select(c => new { col = c.Entity.X, row = c.Entity.Y }).ToArray(),
                 revealedCells = cells.Where(c => !c.Entity.IsHidden).Select(c => new { col = c.Entity.X, row = c.Entity.Y }).ToArray(),
-                visibleItems = Array.Empty<object>() } };
+                visibleItems = Array.Empty<object>(), visibleFragments = visuals.VisibleFragments.Select(f => new {
+                    col = f.Col, row = f.Row, width = f.Width, height = f.Height, rgbaGzipBase64 = f.RgbaGzipBase64 }).ToArray(),
+                visualTemplates = visuals.VisualTemplates.Select(t => new {
+                    kind = t.Kind, widthCells = t.WidthCells, heightCells = t.HeightCells,
+                    width = t.Width, height = t.Height, rgbaGzipBase64 = t.RgbaGzipBase64 }).ToArray(),
+                visualRepresentation = CrystalSphereProjection.Representation } };
             string chosen = await FullAppBridgeServer.WaitForCoordinatorActionAsync("crystal_sphere", false, false, context);
             string[] parts = chosen.Split(':');
             if (parts[0] == "crystal_sphere_tool")

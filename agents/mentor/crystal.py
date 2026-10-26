@@ -1,5 +1,6 @@
-"""公開済みのセルだけで、次に開くセル数を比較する固定基準方策。"""
+"""公開画像で確定した報酬・呪いと、新しく開くセル数を比較する基準方策。"""
 
+from agents.mentor.crystal_vision import recognize
 from sts2.observation import Unsupported, metadata
 
 
@@ -44,19 +45,33 @@ def choose(observation):
     if not clicks:
         raise Unsupported('Crystal Sphereの公開クリック候補がない')
 
+    items, vision = recognize(board, revealed)
+
     # 実ゲームのhover/CellClickedと同じ公開footprint: Bigは周囲8セル＋中心、Smallは中心。
-    def gain(point, tool):
+    def footprint(point, tool):
         x, y = point
         radius = 1 if tool == 'Big' else 0
-        return sum((a, b) in hidden for a in range(x - radius, x + radius + 1)
-                   for b in range(y - radius, y + radius + 1))
+        return {(a, b) for a in range(x - radius, x + radius + 1)
+                for b in range(y - radius, y + radius + 1) if (a, b) in hidden}
+
+    def score(point, tool):
+        opened = footprint(point, tool)
+        active = [item for item in items if item['remaining']]
+        bad = sum(item['curse'] and item['remaining'] <= opened for item in active)
+        complete = sum(not item['curse'] and item['remaining'] <= opened for item in active)
+        progress = sum(len(item['remaining'] & opened) for item in active if not item['curse'])
+        return -bad, complete, progress, len(opened)
 
     tool = board['tool']
-    chosen, point = min(clicks, key=lambda row: (-gain(row[1], tool), row[1][1], row[1][0]))
-    count = gain(point, tool)
-    if tool == 'Small' and 'Big' in tools and max(gain(p, 'Big') for _, p in clicks) > count:
-        chosen = tools['Big']
-    return {'action_id': chosen['id']}, {'source': 'fixed_public_crystal_coverage',
-        'rule': 'maximize_new_hidden_cells; tie=row,col; keep_tool_when_equal',
-        'currentTool': tool, 'maxNewCellsWithCurrentTool': count,
-        'itemVisualsUsed': False}
+    candidates = [(score(point, candidate_tool), candidate_tool, action, point)
+                  for candidate_tool in [tool, *tools] for action, point in clicks]
+    best, best_tool, chosen, point = min(candidates,
+        key=lambda row: (tuple(-v for v in row[0]), row[1] != tool, row[3][1], row[3][0]))
+    if best_tool != tool:
+        chosen = tools[best_tool]
+    return {'action_id': chosen['id']}, {
+        'source': 'fixed_public_crystal_templates' if items else 'fixed_public_crystal_coverage',
+        'rule': 'avoid_known_curse_completion; complete_reward; advance_reward; new_cells; keep_tool; row,col',
+        'currentTool': tool, 'selectedTool': best_tool,
+        'maxNewCellsWithCurrentTool': max(len(footprint(p, tool)) for _, p in clicks),
+        'selectedScore': list(best), 'itemVisualsUsed': bool(vision['available']), 'vision': vision}

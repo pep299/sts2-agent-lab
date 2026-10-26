@@ -104,7 +104,7 @@ class NoncombatPolicy:
             return {'action_id': 'choose_cards:', 'indices': indices}, {
                 'source': 'ppo_optional_card_reward_proxy', 'probs': probs, 'value': value,
                 'count_rule': 'take_cards_ranked_above_skip_up_to_maximum; no_joint_subset_evaluation'}
-        if minimum == 0 and selection.get('parentRelic') != 'CLAWS':
+        if minimum == 0 and selection.get('parentRelic') not in {'CLAWS', 'GNARLED_HAMMER', 'KIFUDA'}:
             raise UnscoredSelection('任意枚数の選択に固定枚数規則がない')
         # 共通観測の生成だけを既存Rustビルダーに任せる。
         packet = self.engine.ppo_wire_obs(base | {'type': 'card_reward', 'cards': [], 'can_skip': True}, 'card_reward')
@@ -126,7 +126,7 @@ class NoncombatPolicy:
         elif 'upgrad' in purpose:
             obs['smith_options'] = [pair[0] for pair in pairs]
             kind = 'smith_card'
-        elif 'obtain' in purpose or 'add' in purpose or 'grant' in purpose:
+        elif any(word in purpose for word in ('obtain', 'add', 'grant', 'copy')):
             obs['card_grant_options'] = pairs
             kind = 'grant_deck_card'
         else:
@@ -136,9 +136,10 @@ class NoncombatPolicy:
         count = maximum if minimum == 0 else minimum
         indices = sorted(sorted(range(len(cards)), key=lambda i: (-probs[i], i))[:count])
         return {'action_id': 'choose_cards:', 'indices': indices}, {
-            'source': 'ppo_selection', 'purpose': selection['purpose'], 'probs': probs, 'value': value,
+            'source': 'ppo_copy_via_grant_proxy' if purpose == 'copy' else 'ppo_selection',
+            'purpose': selection['purpose'], 'probs': probs, 'value': value,
             'multi_pick': 'single inference top-k' if count > 1 else None,
-            'count_rule': 'fixed_maximum_for_claws' if minimum == 0 else 'required_minimum'}
+            'count_rule': 'fixed_maximum_for_' + selection['parentRelic'].lower() if minimum == 0 else 'required_minimum'}
 
     def bundle(self, observation, base, actions):
         bundles = observation['state']['bundles']

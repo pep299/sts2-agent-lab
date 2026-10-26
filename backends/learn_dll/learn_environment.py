@@ -12,17 +12,24 @@ from backends.common.policy_io import PolicyFault
 
 
 class LearnEnvironment:
-    def __init__(self, root, dotnet, output, timeout=35):
+    def __init__(self, root, dotnet, output, timeout=35, *, crystal_assets=None):
         root = Path(root).resolve()
         self.output = Path(output).resolve()
         host = root / 'addons/public-observation/Sts2DllRecorder/bin/Release/net9.0/Sts2DllRecorder.dll'
         if not host.is_file():
             raise FileNotFoundError(f'ビルド済み公開ホストがない: {host}')
+        if crystal_assets is not None:
+            crystal_assets = Path(crystal_assets).resolve()
+            if not crystal_assets.is_dir():
+                raise FileNotFoundError(f'Crystal公開画像資産ディレクトリがない: {crystal_assets}')
         self.host = host
         self.output.mkdir(parents=True, exist_ok=False)
         self.stderr = (self.output / 'host-stderr.log').open('x')
         try:
-            self.process = subprocess.Popen([str(dotnet), str(host), '--log', str(self.output / 'events.jsonl')],
+            command = [str(dotnet), str(host), '--log', str(self.output / 'events.jsonl')]
+            if crystal_assets is not None:
+                command += ['--crystal-assets', str(crystal_assets)]
+            self.process = subprocess.Popen(command,
                     cwd=root, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.stderr, bufsize=0)
         except BaseException:
             self.stderr.close()
