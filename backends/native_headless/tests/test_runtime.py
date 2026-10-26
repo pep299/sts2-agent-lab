@@ -2,9 +2,12 @@
 import sys
 import signal
 import subprocess
+import json
+from io import StringIO
+from types import SimpleNamespace
 import unittest
 
-from runtime import OwnedProcess, unreviewed_native_errors
+from runtime import NativeEnvironment, OwnedProcess, unreviewed_native_errors
 from adapter import resolved_successors
 
 
@@ -36,6 +39,22 @@ class NativeErrorLogTests(unittest.TestCase):
         errors=unreviewed_native_errors(log)
         self.assertEqual(len(errors),1)
         self.assertIn('GameAction.Apply()',errors[0])
+
+
+class DiagnosticBoundaryTests(unittest.TestCase):
+    def test_fixture_initialization_is_recorded_but_not_returned_to_policy(self):
+        env = NativeEnvironment.__new__(NativeEnvironment)
+        env.serial, env.deadline, env.timeout = 0, None, 1
+        env.report, env.private = {}, StringIO()
+        env.proc = SimpleNamespace(poll=lambda: None)
+        env.sock = SimpleNamespace(settimeout=lambda _: None, sendall=lambda _: None)
+        diagnostic = {'allowedBeforeEntry': False, 'requestedEvent': 'EXAMPLE'}
+        env.reader = StringIO(json.dumps({'id': 1, 'result': {'decision_id': 1,
+            'fixtureInitialization': diagnostic, 'observation': {}}}) + '\n')
+        result = env._call('observe')
+        self.assertNotIn('fixtureInitialization', result)
+        self.assertEqual(env.report['fixtureInitialization'], diagnostic)
+        self.assertIn('fixtureInitialization', env.private.getvalue())
 
 class NestedAfterstateTests(unittest.TestCase):
     def test_parent_afterstate_waits_for_child_choice(self):

@@ -18,7 +18,7 @@ public static class FixtureActions
     public static void Add(List<LegalActionDto> actions, string phase)
     {
         if (!Enabled || phase is not ("event" or "combat")) return;
-        var names = phase == "combat" ? new[] { "combat_potion" } : new[] { "grid2", "bundle", "relic", "potions", "draw_order" };
+        var names = phase == "combat" ? new[] { "combat_potion" } : new[] { "grid2", "bundle", "relic", "potions", "draw_order", "merchant" };
         foreach (var name in names)
             actions.Add(new LegalActionDto { ActionId = "fixture:" + name, ActionType = "fixture", Description = "Diagnostic native fixture: " + name });
     }
@@ -27,7 +27,14 @@ public static class FixtureActions
         if (!Enabled) throw new NotSupportedException("Fixture inputs disabled");
         var player = LocalContext.GetMe(RunManager.Instance!.DebugOnlyGetState())!;
         var cards = player.Deck.Cards.Take(4).ToList();
-        if (action == "fixture:draw_order")
+        if (action == "fixture:merchant")
+        {
+            await RunManager.Instance!.EnterRoomDebug(MegaCrit.Sts2.Core.Rooms.RoomType.Shop,
+                MegaCrit.Sts2.Core.Map.MapPointType.Shop, null, showTransition: false);
+            await FullAppBridgeMod.RunShopRoomLoopAsync(MegaCrit.Sts2.Core.Random.Rng.Chaotic, CancellationToken.None);
+            LastResult = new() { ["fixture"] = "merchant" };
+        }
+        else if (action == "fixture:draw_order")
         {
             var deck = player.Deck.Cards;
             var projection = new Sts2Recorder.CardProjection();

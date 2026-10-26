@@ -31,7 +31,8 @@ def write(path, value):
 
 def public_boundary(boundary):
     obs = boundary['observation']
-    return dict(boundary, observation=dict(obs, actions=[a for a in obs['actions']
+    return dict({k: v for k, v in boundary.items() if k != 'fixtureInitialization'},
+                observation=dict(obs, actions=[a for a in obs['actions']
                 if a['kind'] != 'fixture' and not a['id'].startswith('fixture:')]))
 
 
@@ -93,7 +94,8 @@ class LearnFixture(LearnEnvironment):
 
     def begin(self, event, args):
         return self.request({'cmd': 'reset_event', 'eventName': event['name'], 'seed': args.seed,
-                             'hp': args.hp, 'maxHp': args.max_hp, 'gold': args.gold}, self.deadline)
+                             'hp': args.hp, 'maxHp': args.max_hp, 'gold': args.gold,
+                             **getattr(args, 'fixture', {})}, self.deadline)
 
     def step(self, decision):
         return super().step(decision, self.deadline)
@@ -105,10 +107,11 @@ class NativeFixture:
         from runtime import NativeEnvironment
         self.env = NativeEnvironment(output, args.seed, fixture=True, run_seconds=args.seconds,
             max_steps=args.max_steps, event_fixture={'event': event_id(args.event), 'hp': args.hp,
-                'max_hp': args.max_hp, 'gold': args.gold})
+                'max_hp': args.max_hp, 'gold': args.gold, **getattr(args, 'fixture', {})})
 
     def begin(self, event, args):
-        return self.env.start()
+        result = self.env.start()
+        return dict(result, fixtureInitialization=self.env.report.get('fixtureInitialization'))
 
     @property
     def last(self):
@@ -134,12 +137,20 @@ def one_case(args, event, prefix, output, schedule, executed):
               'sourceSha256': SOURCE_HASHES,
               'policyDeadline': 'cooperative between in-process inference calls; host communication has a deadline',
               'initialCondition': {'character': 'IRONCLAD', 'ascension': 0, 'seed': args.seed,
-                                   'hp': args.hp, 'maxHp': args.max_hp, 'gold': args.gold},
+                                   'hp': args.hp, 'maxHp': args.max_hp, 'gold': args.gold,
+                                   **getattr(args, 'fixture', {})},
               'trace': [], 'mentorDecisions': 0, 'forcedDecisions': 0}
     try:
         args.event = event
         env = LearnFixture(args, output) if args.backend == 'learn' else NativeFixture(args, output)
-        boundary = public_boundary(env.begin(event, args))
+        raw = env.begin(event, args)
+        if 'fixtureInitialization' in raw:
+            report['fixtureInitialization'] = raw['fixtureInitialization']
+        elif args.backend == 'learn':
+            initializations = [json.loads(line)['data'] for line in (output / 'events.jsonl').read_text().splitlines()
+                              if json.loads(line)['kind'] == 'event_fixture_initialized']
+            report['fixtureInitialization'] = initializations[-1] if initializations else None
+        boundary = public_boundary(raw)
         state = boundary['observation']['state']
         if state['phase'] == 'event' and state.get('eventId') and state['eventId'].split('.', 1)[-1] != event_id(event):
             raise ValueError('要求したイベントと実際のイベントが異なる')
@@ -236,7 +247,7 @@ def run(args):
     output.mkdir(parents=True, exist_ok=False)
     rows = []
     for event in events:
-        if event.get('category') == 'special':
+        if event.get('category') == 'special' and not getattr(args, 'include_special', False):
             rows.append({'event': event['name'], 'status': 'unsupported_fixture', 'reason': '通常出現プール外。専用の終盤状態が必要'})
             continue
         queue = deque([[]])
@@ -283,6 +294,8 @@ def main():
     parser.add_argument('--fixture-host', type=Path, default=REPO / 'local/learn_dll/event-fixture/bin/Release/net9.0/EventFixture.dll')
     parser.add_argument('--learn-host-dir', type=Path)
     parser.add_argument('--policy-config', type=Path, default=default_config())
+    parser.add_argument('--fixture', type=Path, help='追加のact/potions/add_cards/relics/deckを記載したJSON')
+    parser.add_argument('--include-special', action='store_true')
     parser.add_argument('--seed', default='EVENTCOVER111')
     parser.add_argument('--hp', type=int, default=40)
     parser.add_argument('--max-hp', type=int, default=80)
@@ -291,6 +304,12 @@ def main():
     parser.add_argument('--max-steps', type=int, default=200)
     parser.add_argument('--seconds', type=int, default=120)
     args = parser.parse_args()
+    if args.fixture:
+        args.fixture = json.loads(args.fixture.read_text())
+        if not isinstance(args.fixture, dict) or not args.fixture.keys() <= {'act', 'potions', 'add_cards', 'relics', 'deck'}:
+            parser.error('fixtureの追加フィールドが不正')
+    else:
+        args.fixture = {}
     if args.backend == 'learn' and (args.dotnet is None or args.learn_host_dir is None):
         parser.error('learnには--dotnetと--learn-host-dirが必要')
     if min(args.max_paths, args.max_steps, args.seconds, args.hp, args.max_hp) < 1 or args.hp > args.max_hp or args.gold < 0:

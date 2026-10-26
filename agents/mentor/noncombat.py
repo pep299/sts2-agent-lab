@@ -9,7 +9,7 @@ class UnscoredSelection(Unsupported):
 
 def strategic_actions(observation):
     combat = observation['state']['phase'] == 'combat'
-    return [a for a in observation['actions'] if a['kind'] != 'discard_potion'
+    return [a for a in observation['actions'] if a['kind'] not in ('discard_potion', 'shop_close')
             and (combat or a['kind'] != 'potion')]
 
 
@@ -64,10 +64,16 @@ class NoncombatPolicy:
                     'boss': dict(graph['boss'], id=graph['bossId']) if graph['boss'] else None}}
 
 
-    def score(self, packet, responses):
+    def distribution(self, packet):
         probs, value = self.net.distribution(packet['obs'], packet['actions'], {})
-        if len(probs) != len(responses) or not math.isfinite(value) or any(not math.isfinite(p) or p < 0 for p in probs) or abs(sum(probs)-1) > 1e-4:
+        if len(probs) != len(packet['actions']) or not probs or not math.isfinite(value) or any(not math.isfinite(p) or p < 0 for p in probs) or abs(sum(probs)-1) > 1e-4:
             raise Unsupported('PPOの確率・候補対応が不正')
+        return probs, value
+
+    def score(self, packet, responses):
+        probs, value = self.distribution(packet)
+        if len(probs) != len(responses):
+            raise Unsupported('PPOの応答・候補対応が不正')
         best = max(range(len(probs)), key=probs.__getitem__)
         return responses[best], {'source': 'ppo', 'actions': packet['actions'],
                                  'probs': probs, 'value': value, 'chosen': best}
@@ -80,9 +86,26 @@ class NoncombatPolicy:
             raise Unsupported('戦闘中の子選択を探索状態へ対応させる接続は未実装')
         if selection is None:
             raise Unsupported('公開カード選択がない')
-        if selection['min'] < 1:
-            raise UnscoredSelection('任意枚数の選択はモデル採点へ未対応')
         cards = selection['cards']
+        minimum, maximum = selection['min'], min(selection['max'], len(cards))
+        if not 0 <= minimum <= maximum:
+            raise Unsupported('カード選択の枚数範囲が不正')
+        purpose = (selection.get('purpose') or '').lower()
+        if minimum == 0 and any(word in purpose for word in ('obtain', 'add', 'grant')):
+            packet = self.engine.ppo_wire_obs(base | {'type': 'card_reward',
+                'cards': [card(c) for c in cards], 'can_skip': True}, 'card_reward')
+            probs, value = self.distribution(packet)
+            expected = [{'action': 'pick_card_reward', 'idx': i} for i in range(len(cards))] + [
+                {'action': 'pick_card_reward', 'idx': None}]
+            if packet['actions'] != expected:
+                raise Unsupported('任意取得のカード・skip候補対応が不正')
+            ranked = sorted(range(len(cards)), key=lambda i: (-probs[i], i))
+            indices = sorted([i for i in ranked if probs[i] > probs[-1]][:maximum])
+            return {'action_id': 'choose_cards:', 'indices': indices}, {
+                'source': 'ppo_optional_card_reward_proxy', 'probs': probs, 'value': value,
+                'count_rule': 'take_cards_ranked_above_skip_up_to_maximum; no_joint_subset_evaluation'}
+        if minimum == 0 and selection.get('parentRelic') != 'CLAWS':
+            raise UnscoredSelection('任意枚数の選択に固定枚数規則がない')
         # 共通観測の生成だけを既存Rustビルダーに任せる。
         packet = self.engine.ppo_wire_obs(base | {'type': 'card_reward', 'cards': [], 'can_skip': True}, 'card_reward')
         obs = packet['obs']
@@ -90,7 +113,6 @@ class NoncombatPolicy:
         obs.pop('card_reward_option_upgraded', None)
         obs['phase'] = 'card_select'
         pairs = [(card(c)['id'], bool(card(c)['upgrade_level'])) for c in cards]
-        purpose = (selection.get('purpose') or '').lower()
         if 'transform' in purpose or 'enchant' in purpose:
             name = 'transform' if 'transform' in purpose else 'enchant'
             deck = [(c['id'], bool(c['upgrade_level'])) for c in base['run_state']['master_deck']]
@@ -110,20 +132,58 @@ class NoncombatPolicy:
         else:
             raise UnscoredSelection(f'選択目的がモデル採点へ未対応: {selection.get("purpose")}')
         packet['actions'] = [{'action': kind, 'idx': i} for i in range(len(cards))]
-        probs, value = self.net.distribution(obs, packet['actions'], {})
-        count = selection['min']
+        probs, value = self.distribution(packet)
+        count = maximum if minimum == 0 else minimum
         indices = sorted(sorted(range(len(cards)), key=lambda i: (-probs[i], i))[:count])
         return {'action_id': 'choose_cards:', 'indices': indices}, {
             'source': 'ppo_selection', 'purpose': selection['purpose'], 'probs': probs, 'value': value,
-            'multi_pick': 'single inference top-k' if count > 1 else None}
+            'multi_pick': 'single inference top-k' if count > 1 else None,
+            'count_rule': 'fixed_maximum_for_claws' if minimum == 0 else 'required_minimum'}
+
+    def bundle(self, observation, base, actions):
+        bundles = observation['state']['bundles']
+        if not isinstance(bundles, list) or not bundles or any(not b for b in bundles):
+            raise Unsupported('公開カード束が不正')
+        if any(a['kind'] != 'choose_bundle' for a in actions):
+            raise Unsupported('カード束以外の候補が混在')
+        offered = [metadata(a)['bundle_index'] for a in actions]
+        if len(set(offered)) != len(offered) or set(offered) != set(range(len(bundles))):
+            raise Unsupported('カード束と実行候補の対応が不正')
+        packet = self.engine.ppo_wire_obs(base | {'type': 'card_reward', 'cards': [], 'can_skip': True}, 'card_reward')
+        packet['obs']['phase'] = 'card_select'
+        packet['obs'].pop('card_reward_option_ids', None)
+        packet['obs'].pop('card_reward_option_upgraded', None)
+        flattened = [card(c) for bundle in bundles for c in bundle]
+        packet['obs']['card_grant_options'] = [(c['id'], bool(c['upgrade_level'])) for c in flattened]
+        packet['actions'] = [{'action': 'grant_deck_card', 'idx': i} for i in range(len(flattened))]
+        probs, value = self.distribution(packet)
+        scores, offset = [], 0
+        for bundle in bundles:
+            weights = probs[offset:offset + len(bundle)]
+            scores.append(sum(math.log(p) if p > 0 else -math.inf for p in weights) / len(bundle))
+            offset += len(bundle)
+        best = max(range(len(scores)), key=scores.__getitem__)
+        action = next(a for a in actions if metadata(a)['bundle_index'] == best)
+        return {'action_id': action['id']}, {'source': 'ppo_bundle_card_proxy', 'probs': probs,
+            'value': value, 'bundle_scores': [s if math.isfinite(s) else None for s in scores],
+            'aggregation': 'mean_log_probability_of_single_card_grants; no_joint_bundle_model', 'chosen': best}
 
 
     def choose(self, observation):
         state = observation['state']
+        if state['phase'] == 'shop':
+            opening = [a for a in observation['actions'] if a['kind'] == 'shop_open']
+            if len(opening) > 1:
+                raise Unsupported('店を開く候補が複数ある')
+            if opening:
+                return {'action_id': opening[0]['id']}, {'source': 'fixed_open_shop',
+                    'rule': 'inspect_inventory_before_shop_policy; keep_out_of_combat_potions'}
         base = self.common(observation)
         actions = strategic_actions(observation)
         if state['phase'] == 'grid_selection':
             return self.selection(observation, base)
+        if state['phase'] == 'bundle_selection':
+            return self.bundle(observation, base, actions)
         surface = None
         if state['phase'] == 'map':
             surface = 'map_select'

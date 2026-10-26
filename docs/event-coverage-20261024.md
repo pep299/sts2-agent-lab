@@ -1,78 +1,139 @@
-# v0.111 イベント接続の初回走査
+# v0.111 イベント操作・観測・Mentor接続
 
-65件の登録済みイベントへ両環境で直接入場し、公開されたイベント選択肢とMentorによる後続処理を検査した。全条件の網羅対応は未完了であり、この結果だけで学習中の追加対応が不要とは判断できない。
+更新: 2026-10-26。
 
-## 対象と検査の意味
+登録65イベント（通常57・エンシェント8）と終盤専用TheArchitectについて、洗い出した操作接続の不足を修正した。両環境で公開候補から後続選択・戦闘・報酬・終了まで検査した。対象はソロIronclad・A0。全状態の組合せ、自然出現率、判断の最適性、全ラン勝率の認定ではない。
 
-- 対象DLL: SHA-256 `9cb4f1ad8c9f284aa8fec3122ffd6d780bbf543d875c817abdd12ff63fbf12b4`。
-- `ModelDb`の実登録は通常イベント57件とエンシェント8件。終盤専用のTheArchitectは通常登録外として別記。基底・非推奨・Mock型は母数から除外した。
-- 一覧は`tests/events/catalog.json`。`optionStringLiterals`は一次DLLの文字列であり、生成用prefixやロック表示を含むため合法分岐数ではない。
-- fixture（診断用の初期状態）はソロ・Ironclad・A0・Act1/floor1、初期デッキ、Burning Blood、ポーションなし、HP40/80、gold100、seed `EVENTCOVER111`。gold999の追加走査も実施した。
-- 初期イベントへの直接入場とHP・goldだけを設定し、選択後のカード変更、戦闘、報酬、死亡は実DLLの処理を使う。自然出現条件の検証ではない。エンシェント入場時の回復などにより実際の初期状態は指定値と異なる場合があるため、前状態も保存する。
-- イベント選択肢を順次強制し、カード選択・戦闘・報酬はMentorへ渡す。固定の先頭カード選択による代替は無効。
-- `completed`は公開境界がmapまたはterminalへ進み、正常終了したこと。効果の仕様一致、最善手、勝率、全乱数結果の認定ではない。
-- 記録は`fixture=true`・`expertData=false`。自然な完走ランの教師データに混ぜない。
-
-## 責務
+## 実装の責務
 
 ```text
-catalog → 各backendの診断用入口 → 共通の公開状態・合法候補
-                                      ↓
-                      イベント分岐を強制／後続はMentor
-                                      ↓
-                         実際の後状態・終了・エラー記録
-                                      ↓
-                          learn/nativeの記録フィールド比較
+v0.111実ゲームの処理
+  ├─ learn: GameHost / Recorder（Godot互換環境）
+  └─ native: 実UI・コマンド・画面ハンドラー
+             ↓ 公開状態・合法候補
+backend adapter → 共通STS2観測
+             ↓
+sts2/selection.py: 公開した親イベント・取得レリックから子選択の効果を保持
+             ↓
+agents/mentor: PPO採点 / 戦闘MCTS / 明示した固定・代理方策
+             ↓ 行動ID・選択indices
+backend adapter → 実ゲームの処理 → 次の公開境界
+
+tests/events: 診断状態へ直接入場し、イベント分岐を強制して上記経路を検査
 ```
 
-`sts2/selection.py`は公開された親行動からカード選択の意味を保持する。`agents/mentor/noncombat.py`はその意味をMentorの採点面へ変換する。backendは入力と観測を担当し、診断用入口は通常の方策候補へ渡さない。
+backendはレリックから戦略を推測しない。ドメイン層はモデルを呼ばない。Mentorはbackend固有の候補番号を推測しない。fixture（診断用初期状態）の設定・専用操作は通常方策の入力から除外する。元の効果を独自の結果で置き換えず、ゲームの購入・カード変更・戦闘・報酬処理を使用する。
 
-## 修正と確認
+## 修正内容
 
-| 対象 | 修正 | 確認 |
-|---|---|---|
-| カード選択19分岐 | 一次DLLでremove/transform/upgrade/grant/enchantと付与種類を確認し、公開親キーとの対応を追加 | 未対応だった6イベント14経路、追加のZen Weaverを含む再検査で進行 |
-| エンシェント | Mentorの既存ビルダーが読む`relic_id`を渡す | 6種のエンシェントについて実Rustビルダー・配布モデルで候補順を反転して対応確認。通常イベントのレリック候補は従来面を維持 |
-| nativeの汎用カード選択 | `FromSimpleGridForRewards`と`FromDeckGeneric`は効果を表さないため、既知の公開親文脈に解決させる | Brain Leech、Room Full of Cheese、Wood Carvingsの失敗経路が進行。未知の親は引き続き停止 |
-| native診断ランの死亡 | 直接入場後にゲーム本来の保存APIを使い、死亡時のbackup削除エラーを解消 | Abyssal Bathsの9入力後の死亡、Punch Off・Slippery Bridge・The Lantern Keyの旧失敗経路を再現し正常終了 |
-| nativeのTrial | 選択済みの致死`IsProceed`が開く放棄確認だけYesを押し、放棄・死亡まで待つ | REJECT→DOUBLE_DOWN→死亡を実機確認。汎用modalの自動承認やmap強制表示は行わない |
-| 検査コード | Trialの非seed参加者番号だけを再生照合で正規化。再生不一致から新規分岐を増殖させない | 本文の他の変化、候補・所持資源・カード変更は照合に残す |
-| 比較・終了判定 | summary参照先の欠落・不整合とnative異常終了を失敗にする | 独立レビューの2指摘を再現する回帰テストを追加 |
-
-## 実行結果
-
-各経路の入力、モデル診断、前後状態、実装ハッシュ、終了情報はGit対象外の`local/`へ保存した。以下はその相対パス。
-
-| 記録 | 結果・制限 |
+| 対象 | 変更と確認範囲 |
 |---|---|
-| `local/events/learn-baseline-001/summary.json` | 初回162行: completed150・fault11・終盤専用未実行1。Fake MerchantとポーションなしのThe Future of Potionsは初期mapを旧検査がcompletedと数えたため、対応成功に数えない |
-| `local/native_headless/results/event-baseline-001/summary.json` | 初回194行: completed148・fault44・limit1・終盤専用未実行1。faultの31件は同じTrialの表示番号による再生不一致で、31個のイベント欠陥ではない |
-| `local/events/learn-repaired-001/summary.json` | 未対応だった6イベントの14経路を修正後に再実行し、14経路completed |
-| `local/events/learn-final-pilot-001/summary.json` | gold999、Amalgamator・Brain Leech・Room Full of Cheese・Zen Weaverの9経路completed |
-| `local/native_headless/results/event-final-pilot-001/summary.json` | 同条件の上記4種にWood Carvings・Trialを加え、6種16経路completed |
-| `local/events/compare-final-pilot-001.json` | 同じ公開選択列で対になる9経路は記録フィールド一致。nativeだけの7経路はmissing_case。比較全体の終了コードは1であり、全件一致とはしていない |
-| `local/native_headless/results/event-native-fixes-001/verification.json` | Abyssal BathsとTrialの死亡経路。初期save/backupの実在→死亡後削除、exit0・回収済み・未確認エラー0を確認 |
-| `local/native_headless/results/event-death-recheck-001/summary.json` | Punch Off・Slippery Bridge・The Lantern Keyの旧失敗3経路を同じprefixで再実行し、3経路completed |
+| Fake Merchant | 閉店・開店・閉じる・退出を別操作にし、開いた在庫だけを公開。資金不足、複数購入、在庫更新、閉じて再開、通常店の回帰を確認 |
+| Foul Potion | 実ポーション使用から店の戦闘へ遷移し、古い店境界を返さない。合法な戦闘・報酬取得でMapへ復帰。未購入の偽物レリックとRugを保持。高HP合成状態での撃破は強さの証拠にしない |
+| Crystal Sphere | 未発掘・発掘済み座標、道具、残回数を公開。隠れたItems・正解配置は非公開。実クリックと報酬完了を待つ。AnyTimeポーションと破棄も合法候補として保持 |
+| 致死候補・Trial | learnでも合法な致死候補を除外しない。実際の放棄・死亡まで進行。nativeは終端昇格後の旧選択context・候補を消し、中断中の効果へ戻さない |
+| TheArchitect | 最終Actから実WinRunを呼び、HP0でもvictoryと記録。RunManager.OnEndedの最初の結果をrunごとに保持し、後続の死亡通知で上書きしない |
+| 子カード選択 | 通常イベントの公開親キーと公開レリックから用途を解決。GraveのSOULS_POWER、PAELS_GROWTHのCLONE等を補完。未知の親は停止を維持 |
+| 任意取得・カード束 | 0枚選択、複数取得、束選択を接続。learnの旧CardViewと完全投影の違い、nativeの束ラッパーと汎用画面名の違いを実入力で検出・修正 |
+| 報酬からの選択 | 公開RelicRewardのrelic_idを親として継承。NEOWS_BONES→LEAD_PAPERWEIGHT/POMANDER→Mentorの子選択→Mapを実確認 |
+| カードの公開数値 | 付与後に古い表示キャッシュを読んでいたlearnの投影を修正。DynamicVarSetのコピーへ実ゲームのpreview処理を適用し、元変数・乱数を保持。nativeにも適用 |
+| 既存driver | C# AutoPlayerのFake閉店停止、Python学習例のCloseShop/OpenShop循環を再現・修正。通常店と既存採点順位を保持 |
 
-9経路の比較はHP・最大HP・gold・Act/floor・終了面、デッキの公開コスト/動的値/付与、レリックとカウンター類、ポーションを対象とする。内部処理や未記録の効果の同値性は認定していない。
+## 方策として固定・近似している部分
 
-Python検査127件成功、診断用C#ホストとnative modはビルド警告・エラー0。独立エージェントによるレビュー後に、上記の偽成功を防ぐ2件を修正した。
-
-## 未完了と次の受け入れ条件
-
-| 項目 | 原因・必要な対応 | 次の確認 |
+| 判断 | 現在の方式 | 評価していないこと |
 |---|---|---|
-| Fake Merchant / learn | `GameHost.CurrentMerchantRoom`、`InventoryFor`、`GameStateProjection.ProjectShop`、Recorderが通常のMerchantRoomだけを店と扱う。実在する`FakeMerchant.Inventory`が公開JSONに出ない。Python adapterだけでは購入対応できない | learn forkで通常店とイベント店の在庫取得を共通化。商品6件、資金不足、購入後の金額/在庫/レリック、複数購入、退出、Foul Potionによる戦闘・未購入レリック報酬、通常店の回帰 |
-| Fake Merchant / native | イベント内の専用商店UIを通常の`NMerchantInventory`処理へ接続していない | 同上。候補なしを自動退出や成功扱いにしない |
-| Crystal Sphere / 両環境 | nativeは専用ミニゲーム未接続。learnの既存投影には未公開アイテム情報が含まれるためRecorderが意図的に拒否する | 未発掘セル・道具・残回数・実際に見えた結果だけを公開し、合法座標入力と方策を接続。隠れた配置を変えても未公開段階の入力が変わらないこと。ガード削除だけでは不可 |
-| 致死イベント候補 / learn | `GameHost.BuildEventOptions`は`IsProceed`と`WillKillPlayer`を除外。nativeで選べるTrial.DOUBLE_DOWNなどが欠落する | 実ゲームの合法性と方策による回避を分け、同一状態で候補を照合し、選択した場合は本来の死亡まで進むこと |
-| 条件で出る追加候補 | ポーション、Power/Exhaustカード、変更不可カード、複数レリック、Act2以降などが初期デッキでは満たせない | Stone of All Time/The Future of Potions/Ranwidのポーション、Self Help BookのSwift対象、Grave of the ForgottenのExhaust対象、Relic Traderのレリック5個、出現条件を満たす状態を追加。利用可能/不可の両側を確認 |
-| 資金・HP境界と乱数 | gold999は支払可能側であり、全価格境界ではない。1seedの3レリック提示は全エンシェント候補ではない | 支払額の前後、StoneのHP6/7、Trial/Tinkerの別結果、エンシェントの未提示候補を対象に条件を追加 |
-| TheArchitect | 通常出現プールに登録されず終盤文脈が必要 | 該当する終盤状態から実行し、終了処理まで確認 |
-| Mentorの表現上の限界 | 複数選択は単独スコアの上位k枚（top-k）。StoneやWaterloggedの可変付与量などを配布モデルが十分に表現しない | 操作可能性と判断品質を分離し、必要な入力拡張・別方策を判断。今回の進行成功を高品質な採点の証拠にしない |
+| 固定枚数のカード選択 | 既存PPOの単カード採点から必要枚数の上位を選ぶ | 組合せの相互作用、返還効果、付与量の価値 |
+| 0〜N枚の取得 | 同じcard_reward推論でskipより高い候補を上限まで取得。同点はskip | 複数枚同時取得に最適化した学習 |
+| CLAWSの枚数 | 最大合法枚数を選ぶ固定規則。対象順位だけ既存transform採点 | MAULへの変化を前提にした枚数・対象の最適性 |
+| SCROLL_BOXES | 同じ推論内の単カードgrant対数確率を束ごとに平均する代理採点 | 専用の束モデル、束全体の相乗効果 |
+| Crystal | 新しく開けるセル数を最大化。道具同点は現道具、座標同点は行・列順 | 部分画像を使うアイテム推定、報酬最大化 |
+| 店・ポーション | 閉店時は在庫を開く。Mentorは閉じる操作と戦闘外ポーション使用・破棄を選ばない | 戦闘外ポーションを使う戦略。合法候補自体はbackendから消さない |
 
-learnは調査時のfork commit `1c7212841aa65c44527e435314fc928cecfb2af8`と配布済み公開ホストを使用した。検査後、参照先cloneのビルド出力がなくなったことを確認しており、追加のlearn検査には固定断面のホスト再ビルドが必要。ソースは変更していない。保存済みログにはゲーム・Harness・Recorderのハッシュが残る。
+いずれもエラー時の先頭候補代替ではない。固定規則・代理採点を診断のsourceへ明記する。Mentor実行のselection_fallbackは全検査でfalse。MentorのRustエンジン・ニューラル重みは変更していない。
 
-ゲームアプリは追加複製していない。検査中に差し替えた専用アプリのmodは通常mainソース版へ戻し、通常入口でNeow・診断無効・exit0・回収済み・未確認エラー0を確認した。記録は`local/native_headless/runtime-restoration-20261024.json`。このイベントブランチを再検査する際は、同ブランチのソースからmodを再ビルドする必要がある。
+## 検証結果
 
-次の実装はFake Merchantの在庫共通化と、learnの致死候補差の解消から進める。その後にCrystal Sphereの公開情報設計、条件付きfixtureを追加する。単にイベント名が65件実行されたことを完了条件にしない。
+生ログ・失敗時の記録・再検査はGit対象外のlocal/に保持する。再検査で元の失敗を上書きしていない。経路数には同じ状態からの別選択を含むため、独立した自然ラン数ではない。
+
+completedはイベント退出後のMapまたは実終端へ到達し、ホスト終了検査も通ったこと。Mapで検査を打ち切ったnativeランはoutcome=interrupted・dataValid=falseとなる。これらの記録は自然完走ランとして学習へ渡さない。
+
+| 検査 | 結果 |
+|---|---|
+| 登録65件の基本走査 | learn162経路completed＋ポーションなしFutureのno_public_decision。native163経路completed。接続fault/limitなし |
+| 条件付き状態 / learn | 14条件28経路＋Exhaust2候補の2経路が完了。さらにPower2候補3経路で実カード選択を確認 |
+| 価格の両側 / learn | 18条件39経路完了。Waterlogged55/99、Zen125/250、Tea50/150、Wongo100/200/300の直前・丁度で合法候補が全一致 |
+| 条件付き状態 / native | 18条件40経路中のStone HP6失敗を修正。同じ致死枝・HP7・通常選択・Architectの8経路で再確認。Power2候補の3経路も完了 |
+| Ancient・Trial・Tinker / learn | 19設定64経路中のSCROLL1失敗を修正。同seed3経路を再検査し全対象が完了 |
+| Ancient・Trial・Tinker / native | 16設定53経路中のNeow4失敗を修正。同seed6経路とBattlewornDummy3経路を再検査し完了。12対象の提示欠落なし |
+| 報酬→カード選択 / learn | EVSEED0087のNEOWS_BONESで公開報酬の親ID→grant/upgrade→現Mentor→Map、exit0・回収済み |
+| 公開数値の比較 | 基本走査で149経路の記録フィールドが一致。付与値が異なった5経路を原因修正後に同入力再生し5/5一致 |
+| 回帰試験 | lab Python149件、learn側C#47固有case、Python例5件通過。C#ホスト・native modは警告/エラー0 |
+
+基本走査のFutureはポーションなしでIsAllowed=false。nativeの単一PROCEEDとlearnの自動Mapは終了UIの差であり、昇格効果の検証には数えない。2ポーションを持つ3構成で別途検査した。通常登録外TheArchitectを基本走査がunsupported_fixtureとする行は、専用Act3検査と区別する。
+
+比較全体を「全件一致」とはしていない。Neowの3経路はnativeの再入場による階・回復がlearnと異なる。DollRoomの5選択列はID.titleと翻訳済み名のキー差で自動対応できず、両側10行のmissing_caseになる。これらを効果不一致や一致へ勝手に分類しない。付与値5経路の再比較にも他158経路のmissing_caseがあり、5経路だけの局所一致である。
+
+証拠（リポジトリ相対）:
+
+- 基本走査: local/events/learn-final-sweep-20261026/summary.json、local/native_headless/results/event-final-sweep-20261026/summary.json。
+- learnの条件・価格: local/events/learn-conditional-20261026/scenarios.json、local/events/learn-grave-two-20261026/summary.json、local/events/learn-prices-20261026/scenarios.json。
+- native条件と再検査: local/native_headless/results/event-conditional-20261026/scenarios.json、local/native_headless/results/event-terminal-recheck-20261026/scenarios.json、local/native_headless/results/event-selfhelp-two-powers-20261026/summary.json。
+- 追加選択: local/events/learn-ancient-conditional-20261026/scenarios.json、local/events/learn-bundle-recheck-20261026/summary.json、local/native_headless/results/event-ancient-conditional-20261026/scenarios.json、local/native_headless/results/event-final-recheck-20261026/scenarios.json。
+- 報酬の親継承: local/events/learn-bones-card-child-20261026-001/verification.json。
+- 比較: local/events/compare-final-sweep-20261026.json、local/events/learn-enchantment-replay-20261026/compare-existing-native.json。
+- 試験: local/events/final-python-tests-20261026.log、local/events/learn-driver-compatibility-final-20261026.json。
+- native最終集計・元失敗と再検査の対応: local/events/native-final-verification-20261026.json。
+- 静的調査: local/events/ancient-public-choices-review-20261026.corrected.json、local/events/random-relic-closure-review-20261026.json。
+
+### 追加選択を提示する再現条件
+
+全てHP40/最大80/gold100、追加fixtureなし。seed接頭辞はEVSEED。
+
+| イベント | seed番号 | 実行した対象 |
+|---|---|---|
+| Tanx / Orobas | 0000 | CLAWS / SEA_GLASS |
+| Neow | 0001 | POMANDER |
+| Neow | 0004 | SCROLL_BOXES、HEFTY_TABLET |
+| Neow | 0007 | LEAD_PAPERWEIGHT |
+| Neow | 0023 | NEOWS_BONES |
+| Tezcatara | 0000 / 0007 | BIIIG_HUG / YUMMY_COOKIE |
+| Darv | 0005 | EMPTY_CAGE |
+| Pael | 0005 / 0008 | PAELS_TOOTH / PAELS_GROWTH |
+| Trial | 0001 / 0004 | NOBLE / NONDESCRIPT。それぞれGUILTY/INNOCENTを実選択。MERCHANTは既存EVENTCOVER111 |
+| TinkerTime | 0000 / 0001 / 0004 | 既存EVENTCOVER111と合わせ、3type・9riderを実選択 |
+
+learnの12対象は、除去枚数、強化枚数、CLONE量4、CLAWSのMAUL6枚、取得indicesに対応する追加枚数、束3枚、報酬レリック2個を公開後状態で局所照合した。HEFTY_TABLETは取得カードに加えて必須INJURYがある。v0.111のSCROLL_BOXESにgold費用はない。旧版Mentorの説明を対象版仕様に置き換えない。証拠: local/events/learn-ancient-effect-checks-20261026.json。
+
+## 母数・根拠・残る制限
+
+- tests/events/catalog.jsonは対象DLLのModelDb登録から作成。optionStringLiteralsは合法分岐数ではない。基本型・非推奨・Mockは除外。
+- エンシェントの直接候補102種を対象版資料と実DLLで確認。全300レリックの選択API呼出しも静的照合した。Shop限定のDOLLYS_MIRROR、GNARLED_HAMMER、KIFUDA、PUNCH_DAGGER、ROYAL_STAMPは別の未対応範囲として残る。Fake Merchantは専用の偽物9種から6種であり、この5種を含まない。
+- IsAllowedの記録と直接入場は、自然生成のpool・epoch・既出イベント条件の検査とは別。WarHistorianRepyは登録されるが対象DLLのIsAllowedはfalse。マルチプレイ、他キャラクター、他Ascension、全デッキ/乱数結果は未検証。
+- CrystalのvisibleItemsは空で、部分画像の認識欠落をcapabilitiesへ明示。隠れた正解を読まない代わりに、画面の全情報を再現してはいない。
+- 現PPOはv0.111語彙を拡張した旧重み。対象版向け学習なし、新ID埋め込みは旧未知IDからの初期値。操作の通過は、効果をモデルが正しく評価する証拠ではない。
+- 物理的に別個の同IDカードの価値差、全カード・対象別の戦闘preview、終了済み保存のWinTime=0からの勝利復元は未検証。
+- 既存EventOptionSweepはChooseEventOptionだけを数え、shop面を網羅しない。今回の専用検査の代用にしない。
+- 基本走査後の終端・束・表示値の修正は該当経路と通常戦闘で再検査した。最終ビルドの実行検証範囲はその追加・再検査に限られ、基本全経路の再走査はしていない。
+
+## 固定断面と再実行
+
+- ゲームDLL SHA-256: 9cb4f1ad8c9f284aa8fec3122ffd6d780bbf543d875c817abdd12ff63fbf12b4。
+- PPO SHA-256: b8bb1c85a497598bfa3430ad14b9bf5ca2335c7f3cf4b81101527098ceaa76c8。拡張build: f79727f1fd49a8e22e8403084b1a82210c82b2ae。
+- learnのC#実行断面は42f52f6。後続の450428b/c702978はテストdriver・Python例の互換修正で、Gitlinkはc702978。元GHQ cloneは変更していない。
+- 各caseにsource hash、実際の初期状態、policy identity、入力・後状態・終了情報を保存。fixture=true・expertData=falseであり、教師データへ混ぜない。
+
+```bash
+# 既存のローカル環境設定を使用。モデル・runtimeの準備は別に行う。
+uv run --offline --no-project python -B tests/events/run.py \
+  --backend native --catalog tests/events/catalog.json \
+  --events Neow --seed EVSEED0004 --output local/events/new-neow-check
+
+# learnは --backend learn と、既存dotnet/ホスト出力を明示する。
+# 条件付き状態は --fixture tests/events/fixtures/<name>.json、HP/goldは個別引数。
+# TheArchitectは --include-special --events TheArchitect とact-three.jsonを指定する。
+```
+
+検査後、共有専用アプリのmodを開始前の正確なバイト列へ戻した。mainのmanifest・ソースは変更していない。通常入口でNeow、diagnosticFixture=false、exit0、回収済み、未確認エラー0を確認した。証拠: local/native_headless/runtime-restoration-20261026.json。このブランチのnativeコードを再実行する際はnative-buildでこの断面へ切り替える。検証済みfixture DLLはlocal/native_headless/fixture-runtime-20261026へ保存。
+
+新しいゲームアプリのコピー・ランタイム導入はない。コードと文書のみローカルコミットし、push・PR作成・mainへの統合はしていない。

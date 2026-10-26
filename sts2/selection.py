@@ -5,6 +5,19 @@ from copy import deepcopy
 from sts2.observation import entry
 
 
+RELIC_SELECTIONS = {
+    'NEW_LEAF': ('transform', None), 'ASTROLABE': ('transform', None),
+    'PRESERVED_FOG': ('remove', None), 'PRECARIOUS_SHEARS': ('remove', None),
+    'PRECISE_SCISSORS': ('remove', None), 'BIIIG_HUG': ('remove', None),
+    'EMPTY_CAGE': ('remove', None), 'PAELS_TOOTH': ('remove', None),
+    'POMANDER': ('upgrade', None), 'YUMMY_COOKIE': ('upgrade', None),
+    'TRI_BOOMERANG': ('enchant', 'INSTINCT'), 'ELECTRIC_SHRYMP': ('enchant', 'IMBUED'),
+    'PAELS_GROWTH': ('enchant', 'CLONE'), 'CLAWS': ('transform', None),
+    'SEA_GLASS': ('grant', None), 'HEFTY_TABLET': ('grant', None),
+    'LEAD_PAPERWEIGHT': ('grant', None),
+}
+
+
 class SelectionContext:
     def __init__(self):
         self.reset()
@@ -12,6 +25,7 @@ class SelectionContext:
     def reset(self):
         self.selection_purpose = None
         self.selection_enchantment = None
+        self.parent_relic = None
 
     def prepare(self, observation):
         state = observation['state']
@@ -28,6 +42,8 @@ class SelectionContext:
                 selection['purpose'] = None
         if not selection.get('enchantment'):
             selection['enchantment'] = self.selection_enchantment
+        if self.parent_relic:
+            selection['parentRelic'] = self.parent_relic
         return obs
 
     def remember(self, observation, response):
@@ -35,9 +51,19 @@ class SelectionContext:
             return
         self.selection_purpose = None
         self.selection_enchantment = None
+        self.parent_relic = None
         action = next(a for a in observation['actions'] if a['id'] == response['action_id'])
         detail = action['detail']
         meta = detail['metadata']
+        relic = meta.get('relic_id')
+        if action['kind'] == 'buy' and meta.get('entry_type') == 'MerchantRelicEntry':
+            relic = meta.get('item_id')
+        if action['kind'] == 'event':
+            option = next(o for o in observation['state']['options'] if o['index'] == meta['option_index'])
+            relic = option.get('relic')
+        if relic:
+            self.parent_relic = entry(relic)
+            self.selection_purpose, self.selection_enchantment = RELIC_SELECTIONS.get(self.parent_relic, (None, None))
         if action['kind'] == 'rest' and meta.get('option_key') == 'SMITH':
             self.selection_purpose = 'upgrade'
         elif action['kind'] == 'buy' and meta.get('entry_type') == 'MerchantCardRemovalEntry':
@@ -45,13 +71,6 @@ class SelectionContext:
         elif action['kind'] == 'event':
             index = meta['option_index']
             option = next(o for o in observation['state']['options'] if o['index'] == index)
-            # 公開レリックの既知の効果。候補のカード種類から目的を推測しない。
-            self.selection_purpose = {'NEW_LEAF': 'transform', 'ASTROLABE': 'transform', 'PRESERVED_FOG': 'remove',
-                                      'PRECARIOUS_SHEARS': 'remove', 'PRECISE_SCISSORS': 'remove',
-                                      'TRI_BOOMERANG': 'enchant', 'ELECTRIC_SHRYMP': 'enchant'}.get(entry(option.get('relic') or ''))
-            if self.selection_purpose == 'enchant':
-                self.selection_enchantment = {'TRI_BOOMERANG': 'INSTINCT', 'ELECTRIC_SHRYMP': 'IMBUED'}[
-                    entry(option.get('relic') or '')]
             key = option.get('text_key')
             purposes = {'AROMA_OF_CHAOS.pages.INITIAL.options.LET_GO': 'transform',
                         'AROMA_OF_CHAOS.pages.INITIAL.options.MAINTAIN_CONTROL': 'upgrade',
@@ -87,6 +106,7 @@ class SelectionContext:
                      'WATERLOGGED_SCRIPTORIUM.pages.INITIAL.options.TENTACLE_QUILL': 'STEADY',
                      'WATERLOGGED_SCRIPTORIUM.pages.INITIAL.options.PRICKLY_SPONGE': 'STEADY',
                      'WOOD_CARVINGS.pages.INITIAL.options.SNAKE': 'SLITHER',
+                     'GRAVE_OF_THE_FORGOTTEN.pages.INITIAL.options.CONFRONT': 'SOULS_POWER',
                      'SYMBIOTE.pages.INITIAL.options.APPROACH': 'CORRUPTED'}
             if key in books:
                 self.selection_purpose = 'enchant'

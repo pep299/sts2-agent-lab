@@ -1,10 +1,11 @@
 from pathlib import Path
 import os
 import sys
+from types import SimpleNamespace
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-from agents.mentor.noncombat import NoncombatPolicy
+from agents.mentor.noncombat import NoncombatPolicy, strategic_actions
 from agents.mentor.runtime import MentorRuntime, default_config
 from sts2.observation import Unsupported
 
@@ -16,6 +17,23 @@ def observation(phase):
         'map': {'nodes': [{'coord': {'row': 1, 'col': i}, 'roomType': 'Monster', 'children': []}
                           for i in range(2)], 'current': None, 'boss': None, 'bossId': None}}},
         'actions': []}
+
+
+class ClosedShopContract(unittest.TestCase):
+    def test_opening_inventory_is_distinct_from_purchasing_or_leaving(self):
+        obs = observation('shop')
+        obs['actions'] = [{'id': name, 'kind': name, 'detail': {'metadata': {}}}
+                          for name in ('shop_leave', 'shop_open', 'potion')]
+        policy = NoncombatPolicy(SimpleNamespace(engine=None, net=None))
+        response, info = policy.choose(obs)
+        self.assertEqual(response, {'action_id': 'shop_open'})
+        self.assertEqual(info['source'], 'fixed_open_shop')
+
+    def test_fixed_policy_excludes_close_but_preserves_leave(self):
+        obs = observation('shop')
+        obs['actions'] = [{'id': kind, 'kind': kind} for kind in ('buy', 'shop_close', 'shop_leave', 'potion')]
+        self.assertEqual([a['kind'] for a in strategic_actions(obs)], ['buy', 'shop_leave'])
+        self.assertEqual([a['kind'] for a in obs['actions']], ['buy', 'shop_close', 'shop_leave', 'potion'])
 
 
 class NoncombatInterface(unittest.TestCase):

@@ -18,18 +18,20 @@ public sealed class SpecialChoiceContext
     public List<LegalActionDto> Actions { get; init; } = new();
     public IReadOnlyList<IReadOnlyList<CardModel>>? Bundles { get; init; }
     public IReadOnlyList<RelicModel>? Relics { get; init; }
+    public object? CrystalSphere { get; init; }
 }
 
 public static class SpecialChoices
 {
-    public static bool HasScreen => NOverlayStack.Instance?.Peek() is NChooseABundleSelectionScreen or NChooseARelicSelection;
+    public static bool HasScreen => NOverlayStack.Instance?.Peek() is NChooseABundleSelectionScreen or NChooseARelicSelection || NativeCrystalSphere.HasScreen;
     public static void Apply(Harmony harmony)
     {
         harmony.Patch(AccessTools.Method(typeof(ChooseABundleScreenHandler), "HandleAsync"), prefix: new HarmonyMethod(typeof(SpecialChoices), nameof(BundlePrefix)));
         harmony.Patch(AccessTools.Method(typeof(ChooseARelicScreenHandler), "HandleAsync"), prefix: new HarmonyMethod(typeof(SpecialChoices), nameof(RelicPrefix)));
+        NativeCrystalSphere.Apply(harmony);
         // These card operations normally enter our ICardSelector. If a content path bypasses it,
         // refuse the unconnected UI rather than allowing AutoSlay's random input.
-        foreach (Type type in new[] { typeof(DeckTransformScreenHandler), typeof(DeckEnchantScreenHandler), typeof(ChooseACardScreenHandler), typeof(CrystalSphereScreenHandler) })
+        foreach (Type type in new[] { typeof(DeckTransformScreenHandler), typeof(DeckEnchantScreenHandler), typeof(ChooseACardScreenHandler) })
             harmony.Patch(AccessTools.Method(type, "HandleAsync"), prefix: new HarmonyMethod(typeof(SpecialChoices), nameof(UnsupportedPrefix)));
     }
     private static bool BundlePrefix(CancellationToken ct, ref Task __result) { __result = Guard(Bundles(ct)); return false; }
@@ -40,10 +42,11 @@ public static class SpecialChoices
         FullAppBridgeServer.Fault(error); __result = Task.FromException(error); return false;
     }
     private static async Task Guard(Task task) { try { await task; } catch (Exception error) { FullAppBridgeServer.Fault(error); throw; } }
-    public static async Task<bool> Handle(CancellationToken ct)
+    public static async Task<bool> Handle(CancellationToken ct, Func<Task<bool>>? handleRewards = null)
     {
         if (NOverlayStack.Instance?.Peek() is NChooseABundleSelectionScreen) { await Bundles(ct); return true; }
         if (NOverlayStack.Instance?.Peek() is NChooseARelicSelection) { await Relics(ct); return true; }
+        if (NativeCrystalSphere.HasScreen) { await NativeCrystalSphere.Handle(ct, handleRewards ?? (() => Task.FromResult(false))); return true; }
         return false;
     }
     private static async Task Bundles(CancellationToken ct)

@@ -280,12 +280,12 @@ def compare(learn_root, native_root):
             'coverageGaps': {backend: data[1] for backend, data in loaded.items()},
             'readErrors': {backend: data[2] for backend, data in loaded.items()},
             'semanticEffectVerified': False, 'allBranchesVerified': False, 'winRateImprovementVerified': False,
-            'scope': ['開始Act1・floor1の診断fixture。同じ公開選択列と記録された初期状態・後状態の比較。',
+            'scope': ['初期条件を宣言した診断fixture。同じ公開選択列と記録された初期状態・後状態の比較。',
                       'カードの物理ID・デッキ表示順・ローカライズ・backend固有行動IDは比較しない。',
                       'カードはID・強化・keywords・付与・affliction・特殊値と、公開された型・コスト・dynamicVars・retain・slyを比較。',
                       'relicDetailsがある場合はID・表示カウンター・stackCount・isMelted・isUsedUp・dynamicVarsも比較。欠落時は未比較と明示。',
                       '同じ終了状態でも内部処理・未記録効果の同値性は未認定。条件付き全分岐とランダム結果は未網羅。',
-                      '終盤専用のTheArchitect文脈、自然出現条件、勝率改善は未検証。']}
+                      '自然出現条件、出現率、勝率改善は比較対象外。']}
 
 
 def main():

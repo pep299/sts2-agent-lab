@@ -226,7 +226,7 @@ public static class FullAppStateTracker
         if (runState is not null)
         {
             isTerminal = runState.IsGameOver;
-            isVictory = isTerminal && runManager!.WinTime > 0;
+            isVictory = NativeRunOutcome.IsVictory(runState);
             if (isTerminal)
             {
                 phase = "game_over";
@@ -567,12 +567,14 @@ public static class FullAppStateTracker
                 {
                     string rewardType = r.GetType().Name.Replace("Reward", "");
                     roomObs.Options.Add($"{idx}:{rewardType}");
+                    var rewardMetadata = new Dictionary<string, object?> { ["reward_index"] = idx, ["reward_type"] = rewardType };
+                    if (PublicObservation.RewardRelic(r) is { } relic) rewardMetadata["relic_id"] = relic.Id.Entry;
                     legalActions.Add(new LegalActionDto
                     {
                         ActionId = $"choose_reward:{idx}:{rewardType}",
                         ActionType = "choose_reward",
                         Description = $"Claim {rewardType} reward",
-                        Metadata = new Dictionary<string, object?> { ["reward_index"] = idx, ["reward_type"] = rewardType }
+                        Metadata = rewardMetadata
                     });
                     idx++;
                 }

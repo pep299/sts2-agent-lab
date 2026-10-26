@@ -188,11 +188,22 @@ public static class FullAppBridgeServer
         while (true)
         {
             AutoSlayer.CurrentWatchdog?.Reset($"Bridge:{phase}");
-            var (raw, actions) = FullAppStateTracker.CreateStateSnapshot(phase, isTerminal, isVictory, contextObject);
-            if (contextObject is SpecialChoiceContext special) actions = special.Actions;
-            if (isTerminal) actions.Clear();
-            else PotionActions.Add(actions, phase);
-            FixtureActions.Add(actions, phase);
+            var (raw, actions) = FullAppStateTracker.CreateStateSnapshot(phase, isTerminal, isVictory,
+                contextObject is MerchantChoiceContext merchant ? merchant.Entries : contextObject);
+            isTerminal = raw.IsTerminal;
+            isVictory = raw.IsVictory;
+            if (isTerminal)
+            {
+                contextObject = null;
+                actions.Clear();
+            }
+            else
+            {
+                if (contextObject is MerchantChoiceContext shop) shop.AddControls(actions);
+                if (contextObject is SpecialChoiceContext special) actions = special.Actions;
+                PotionActions.Add(actions, phase);
+                FixtureActions.Add(actions, phase);
+            }
             var publicObservation = PublicObservation.Capture(raw, actions, contextObject);
             Task<string>? waiting = null;
             lock (Gate)
@@ -202,20 +213,31 @@ public static class FullAppBridgeServer
                 selection = contextObject as CardSelectContext;
                 decisionId++;
                 if (!isTerminal) { pendingAction = Completion<string>(); waiting = pendingAction.Task; }
-                snapshot = new { decision_id = decisionId, observation = publicObservation };
+                snapshot = new { decision_id = decisionId, observation = publicObservation,
+                    fixtureInitialization = FixtureActions.Enabled ? EventFixture.Initialization : null };
                 inFlight = false;
                 var completion = nextBoundary; nextBoundary = null;
                 completion?.TrySetResult(snapshot);
             }
-            if (isTerminal) return "terminal_halt";
+            // 終端後は中断中のカード効果へ戻さず、close RPCでプロセスを終了する。
+            if (isTerminal) return await Completion<string>().Task;
             string chosen = await waiting!;
-            if (chosen.StartsWith("fixture:", StringComparison.Ordinal)) { await FixtureActions.Apply(chosen); continue; }
+            if (chosen.StartsWith("fixture:", StringComparison.Ordinal))
+            {
+                await FixtureActions.Apply(chosen);
+                if (chosen == "fixture:merchant") return "event_room_changed";
+                continue;
+            }
             if (PotionActions.IsPotion(chosen))
             {
+                bool startsEventCombat = phase == "shop" && NativeMerchant.StartsEventCombat(chosen);
                 await PotionActions.Apply(chosen);
+                if (startsEventCombat) await NativeMerchant.WaitForEventCombat();
                 // 古い戦闘の判断を作り直さず、部屋ハンドラーの報酬・終端処理へ戻す。
                 if (phase == "combat" && MegaCrit.Sts2.Core.Combat.CombatManager.Instance?.IsInProgress != true)
                     return "combat_finished";
+                if (phase == "shop" && MegaCrit.Sts2.Core.Combat.CombatManager.Instance?.IsInProgress == true)
+                    return "shop_combat_started";
                 continue;
             }
             return chosen;

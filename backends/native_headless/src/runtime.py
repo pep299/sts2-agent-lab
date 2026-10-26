@@ -38,7 +38,7 @@ def event_fixture_parameters(value, *, fixture, save):
     if value is None:return {}
     if not fixture or save is not None:
         raise ValueError('Event fixtures require fixture=True and a fresh run')
-    if not isinstance(value,dict) or not value.keys() <= {'event','hp','max_hp','gold'}:
+    if not isinstance(value,dict) or not value.keys() <= {'event','hp','max_hp','gold','act','potions','add_cards','relics','deck'}:
         raise ValueError('Unknown event fixture fields')
     event=value.get('event')
     if not isinstance(event,str) or re.fullmatch(r'[A-Z0-9_]{1,80}',event) is None:
@@ -49,6 +49,16 @@ def event_fixture_parameters(value, *, fixture, save):
         if name in value and (type(value[name]) is not int or value[name] < (0 if name=='gold' else 1)):
             raise ValueError('Invalid fixture integer: '+name)
     if value.get('hp',0)>value.get('max_hp',0):raise ValueError('Fixture HP exceeds maximum HP')
+    if 'act' in value and (type(value['act']) is not int or not 1<=value['act']<=3):
+        raise ValueError('Fixture act must be 1, 2 or 3')
+    if event=='THE_ARCHITECT' and value.get('act')!=3:
+        raise ValueError('The Architect fixture requires the final act')
+    for name in ('potions','add_cards','relics','deck'):
+        if name not in value:continue
+        ids=value[name]
+        if not isinstance(ids,list) or any(not (item is None and name=='potions') and
+                (not isinstance(item,str) or re.fullmatch(r'[A-Z0-9_]{1,80}',item) is None) for item in ids):
+            raise ValueError('Invalid fixture model IDs: '+name)
     return {'fixture_'+name:amount for name,amount in value.items()}
 
 def validate_mods(executable):
@@ -169,7 +179,12 @@ class NativeEnvironment:
                 if 'NotSupportedException' in message:raise Unsupported(message)
                 if 'ArgumentException' in message or any(x in message for x in ['Stale decision_id','duplicate request_id','No input is currently accepted','Terminal boundary']):raise RequestRejected(message)
                 raise EnvironmentFault(message)
-            return response['result']
+            result=response['result']
+            if isinstance(result,dict) and 'fixtureInitialization' in result:
+                if result['fixtureInitialization'] is not None:
+                    self.report['fixtureInitialization']=result['fixtureInitialization']
+                return {key:value for key,value in result.items() if key!='fixtureInitialization'}
+            return result
         except (socket.timeout,TimeoutError) as error:
             if self.deadline is not None and time.monotonic()>=self.deadline and method in ['start_run','step']:
                 raise DeclaredLimit('declared_wall_time_limit') from error

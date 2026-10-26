@@ -62,30 +62,79 @@ static int Serve(string[] args, TextWriter output)
             }
             if (name == "reset_event")
             {
-                ValidateFields(command, "cmd", "eventName", "seed", "hp", "maxHp", "gold");
+                ValidateFields(command, "cmd", "eventName", "seed", "hp", "maxHp", "gold", "act", "potions", "add_cards", "relics", "deck");
                 string eventName = RequiredString(command, "eventName");
                 string seed = RequiredString(command, "seed");
-                var matching = registered.Keys.Where(e => e.GetType().Name == eventName || Get(e, "Id").ToString() == eventName).ToArray();
+                var candidates = registered.Keys.AsEnumerable();
+                if (eventName is "TheArchitect" or "EVENT.THE_ARCHITECT" or "THE_ARCHITECT")
+                {
+                    var modelType = game.GetType("MegaCrit.Sts2.Core.Models.Events.TheArchitect", true)!;
+                    var factory = db.GetMethods().Single(m => m.Name == "Event" && m.IsGenericMethodDefinition);
+                    candidates = candidates.Append(factory.MakeGenericMethod(modelType).Invoke(null, null)!);
+                }
+                var matching = candidates.Where(e => e.GetType().Name == eventName || Get(e, "Id").ToString() == eventName
+                    || Get(Get(e, "Id"), "Entry").ToString() == eventName).ToArray();
                 if (matching.Length != 1) throw new ArgumentException("登録済みイベントを一意に指定できない: " + eventName);
                 int hp = command.TryGetProperty("hp", out var hpNode) ? hpNode.GetInt32() : 40;
                 int maxHp = command.TryGetProperty("maxHp", out var maxNode) ? maxNode.GetInt32() : 80;
                 int gold = command.TryGetProperty("gold", out var goldNode) ? goldNode.GetInt32() : 100;
-                if (maxHp < 1 || hp < 1 || hp > maxHp || gold < 0) throw new ArgumentOutOfRangeException("hp/maxHp/gold");
+                int act = command.TryGetProperty("act", out var actNode) ? actNode.GetInt32() : 1;
+                if (maxHp < 1 || hp < 1 || hp > maxHp || gold < 0 || act is < 1 or > 3)
+                    throw new ArgumentOutOfRangeException("hp/maxHp/gold/act");
+                if (matching[0].GetType().Name == "TheArchitect" && act != 3)
+                    throw new ArgumentException("TheArchitectは最終Actのfixtureを指定する");
+                var potions = Ids(command, "potions", allowNull: true);
+                var added = Ids(command, "add_cards") ?? [];
+                var relics = Ids(command, "relics") ?? [];
+                var deck = Ids(command, "deck");
                 entered = false;
                 Call(recorder, "Reset", seed, "seeded_all_unlocked");
                 object host = Get(recorder, "Host");
-                var player = Items(Get(Get(host, "Run"), "Players")).Single();
+                object run = Get(host, "Run");
+                var manager = game.GetType("MegaCrit.Sts2.Core.Runs.RunManager", true)!.GetProperty("Instance")!.GetValue(null)!;
+                if (act != 1) Await(Call(manager, "EnterAct", act - 1, false));
+                var player = Items(Get(run, "Players")).Single();
+                foreach (var id in relics) Call(host, "ObtainRelicDebug", Model(db, "AllRelics", id!));
+                if (Get(Get(host, "Selector"), "Pending") is not null || Get(host, "PendingRewards") is not null)
+                    throw new ArgumentException("初期化時に追加選択を生むレリックはこのfixtureでは使用できない");
+                var piles = game.GetType("MegaCrit.Sts2.Core.Commands.CardPileCmd", true)!;
+                if (deck != null)
+                    foreach (var card in Items(Get(Get(player, "Deck"), "Cards")))
+                        Await(Static(piles, "RemoveFromDeck", card));
+                var deckType = Enum.Parse(game.GetType("MegaCrit.Sts2.Core.Entities.Cards.PileType", true)!, "Deck");
+                foreach (var id in (deck ?? []).Concat(added))
+                    Await(Static(piles, "Add", Call(run, "CreateCard", Model(db, "AllCards", id!), player), deckType));
+                if (potions != null)
+                {
+                    if (potions.Length > Convert.ToInt32(Get(player, "MaxPotionCount")))
+                        throw new ArgumentException("ポーションの指定スロットが容量を超える");
+                    var cmd = game.GetType("MegaCrit.Sts2.Core.Commands.PotionCmd", true)!;
+                    foreach (var potion in Items(Get(player, "Potions"))) Await(Static(cmd, "Discard", potion));
+                    for (int slot = 0; slot < potions.Length; slot++)
+                        if (potions[slot] is string id)
+                        {
+                            var result = Await(Static(cmd, "TryToProcure", Call(Model(db, "AllPotions", id), "ToMutable"), player, slot))!;
+                            if (result.GetType().GetField("success")?.GetValue(result) is not true)
+                                throw new InvalidOperationException("ポーションの配置に失敗: " + slot);
+                        }
+                }
                 var creature = Get(player, "Creature");
                 Call(creature, "SetMaxHpInternal", maxHp);
                 Call(creature, "SetCurrentHpInternal", hp);
                 var goldProperty = player.GetType().GetProperty("Gold")!;
                 goldProperty.SetValue(player, Coerce(gold, goldProperty.PropertyType));
+                bool allowedBeforeEntry = (bool)Call(matching[0], "IsAllowed", run);
+                var beforeEntry = new { act = Convert.ToInt32(Get(run, "CurrentActIndex")) + 1,
+                    deck = Items(Get(Get(player, "Deck"), "Cards")).Select(c => Get(c, "Id").ToString()).ToArray(),
+                    relics = Items(Get(player, "Relics")).Select(r => Get(r, "Id").ToString()).ToArray(),
+                    potions = ((IEnumerable)Get(player, "PotionSlots")).Cast<object?>().Select(p => p == null ? null : Get(p, "Id").ToString()).ToArray() };
                 if (matching[0].GetType().Name != "Neow") Call(host, "EnterEventDebug", matching[0]);
                 entered = true;
                 Write(recorder, "event_fixture_initialized", new
                 {
                     fixture = true, expertData = false, eventName,
-                    requested = new { hp, maxHp, gold },
+                    requested = new { hp, maxHp, gold, act, potions, add_cards = added, relics, deck },
+                    allowedBeforeEntry, beforeEntry,
                     actual = new { hp = Get(creature, "CurrentHp"), maxHp = Get(creature, "MaxHp"), gold = Get(player, "Gold") }
                 });
             }
@@ -139,11 +188,38 @@ static object[] Items(object value) => ((IEnumerable)value).Cast<object>().ToArr
 static object Get(object value, string name) => value.GetType().GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(value)!;
 static object Call(object value, string name, params object[] args)
 {
-    var method = value.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-        .Single(m => m.Name == name && m.GetParameters().Count(p => !p.IsOptional) <= args.Length && m.GetParameters().Length >= args.Length);
+    return Invoke(value.GetType(), value, BindingFlags.Instance, name, args);
+}
+static object Static(Type type, string name, params object[] args) => Invoke(type, null, BindingFlags.Static, name, args);
+static object Invoke(Type type, object? instance, BindingFlags binding, string name, object[] args)
+{
+    var method = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | binding)
+        .Single(m => m.Name == name && !m.ContainsGenericParameters
+            && m.GetParameters().Count(p => !p.IsOptional) <= args.Length && m.GetParameters().Length >= args.Length
+            && m.GetParameters().Take(args.Length).Select((p, i) => p.ParameterType.IsInstanceOfType(args[i])
+                || args[i] is IConvertible && typeof(IConvertible).IsAssignableFrom(p.ParameterType)).All(ok => ok));
     object?[] supplied = args.Concat(method.GetParameters().Skip(args.Length).Select(p => p.DefaultValue!)).ToArray();
     supplied = supplied.Select((argument, index) => Coerce(argument, method.GetParameters()[index].ParameterType)).ToArray();
-    return method.Invoke(value, supplied)!;
+    return method.Invoke(instance, supplied)!;
+}
+static object? Await(object value)
+{
+    var task = (Task)value;
+    task.GetAwaiter().GetResult();
+    return task.GetType().GetProperty("Result")?.GetValue(task);
+}
+static object Model(Type db, string pool, string id) => Items(db.GetProperty(pool)!.GetValue(null)!)
+    .Single(model => Get(Get(model, "Id"), "Entry").ToString() == id);
+static string?[]? Ids(JsonElement command, string key, bool allowNull = false)
+{
+    if (!command.TryGetProperty(key, out var values)) return null;
+    return values.EnumerateArray().Select(value => {
+        if (allowNull && value.ValueKind == JsonValueKind.Null) return null;
+        string id = value.ValueKind == JsonValueKind.String ? value.GetString()! : "";
+        if (id.Length is < 1 or > 80 || id.Any(c => c != '_' && !char.IsAsciiLetterOrDigit(c)))
+            throw new ArgumentException("モデルIDが不正: " + key);
+        return id;
+    }).ToArray();
 }
 static object? Coerce(object? value, Type target) => value is null || target.IsInstanceOfType(value)
     ? value : value is IConvertible ? Convert.ChangeType(value, Nullable.GetUnderlyingType(target) ?? target) : value;

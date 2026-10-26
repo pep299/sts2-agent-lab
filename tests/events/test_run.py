@@ -14,12 +14,13 @@ spec.loader.exec_module(checks)
 
 class EventBoundaries(unittest.TestCase):
     def test_diagnostic_actions_are_not_policy_candidates(self):
-        original = {'decision_id': 1, 'observation': {'actions': [
+        original = {'decision_id': 1, 'fixtureInitialization': {'hiddenFixtureCondition': True}, 'observation': {'actions': [
             {'id': 'event:0', 'kind': 'event'}, {'id': 'fixture:grid2', 'kind': 'fixture'},
             {'id': 'fixture:event', 'kind': 'event'}]}}
         before = copy.deepcopy(original)
         filtered = checks.public_boundary(original)
         self.assertEqual(filtered['observation']['actions'], [{'id': 'event:0', 'kind': 'event'}])
+        self.assertNotIn('fixtureInitialization', filtered)
         self.assertEqual(original, before)
 
     def test_replay_signature_ignores_physical_ids_but_preserves_modifiers_and_costs(self):
