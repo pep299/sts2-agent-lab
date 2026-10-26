@@ -30,7 +30,7 @@ backendはレリックから戦略を推測しない。ドメイン層はモデ�
 |---|---|
 | Fake Merchant | 閉店・開店・閉じる・退出を別操作にし、開いた在庫だけを公開。資金不足、複数購入、在庫更新、閉じて再開、通常店の回帰を確認 |
 | Foul Potion | 実ポーション使用から店の戦闘へ遷移し、古い店境界を返さない。合法な戦闘・報酬取得でMapへ復帰。未購入の偽物レリックとRugを保持。高HP合成状態での撃破は強さの証拠にしない |
-| Crystal Sphere | 未発掘・発掘済み座標、道具、残回数と公開セルの画像片を公開。実配置に依存しない固定10画像辞書を添え、Mentorで画像照合する。隠れたItems・正解配置は非公開。実クリックと報酬完了を待つ。AnyTimeポーションと破棄も合法候補として保持 |
+| Crystal Sphere | 開閉マップで正解マップをマスクし、開いたセルの座標と内容だけを公開。未開セルは座標のみ。内容はempty/gold/potion/card_reward/relic/curse。実クリックと報酬完了を待つ。AnyTimeポーションと破棄も合法候補として保持 |
 | 致死候補・Trial | learnでも合法な致死候補を除外しない。実際の放棄・死亡まで進行。nativeは終端昇格後の旧選択context・候補を消し、中断中の効果へ戻さない |
 | TheArchitect | 最終Actから実WinRunを呼び、HP0でもvictoryと記録。RunManager.OnEndedの最初の結果をrunごとに保持し、後続の死亡通知で上書きしない |
 | 子カード選択 | 通常イベントの公開親キーと公開レリックから用途を解決。GraveのSOULS_POWER、PAELS_GROWTHのCLONE等を補完。未知の親は停止を維持 |
@@ -49,7 +49,7 @@ backendはレリックから戦略を推測しない。ドメイン層はモデ�
 | CLAWS / Hammer / Kifudaの枚数 | 最大合法枚数を選ぶ固定規則。対象順位だけ既存transform/enchant採点 | 変化・付与を前提にした枚数・対象の最適性 |
 | Dollyの複製対象 | 既存grant採点による代理評価。診断sourceはppo_copy_via_grant_proxy | 複製専用のモデル・学習 |
 | SCROLL_BOXES | 同じ推論内の単カードgrant対数確率を束ごとに平均する代理採点 | 専用の束モデル、束全体の相乗効果 |
-| Crystal | 固定辞書と可視セルの全画素を全合法配置で照合。同じ矩形・害の有無に絞れたものだけ採用。既知呪いの完成回避→報酬完成数→報酬への進捗→新規セル数。道具同点は現道具、座標同点は行・列順 | 未知画像の推定、報酬種類ごとの価値、最適な先読み |
+| Crystal | 公開セルの内容と既知形状から全合法配置を仮説化し、範囲が一意のものだけ採用。既知呪いの完成回避→報酬完成数→報酬への進捗→新規セル数。道具同点は現道具、座標同点は行・列順 | 同型が並ぶ場合の境界推定、報酬種類ごとの価値、最適な先読み |
 | 店・ポーション | 閉店時は在庫を開く。Mentorは閉じる操作と戦闘外ポーション使用・破棄を選ばない | 戦闘外ポーションを使う戦略。合法候補自体はbackendから消さない |
 
 いずれもエラー時の先頭候補代替ではない。固定規則・代理採点を診断のsourceへ明記する。Mentor実行のselection_fallbackは全検査でfalse。MentorのRustエンジン・ニューラル重みは変更していない。
@@ -70,11 +70,10 @@ completedはイベント退出後のMapまたは実終端へ到達し、ホス�
 | Ancient・Trial・Tinker / native | 16設定53経路中のNeow4失敗を修正。同seed6経路とBattlewornDummy3経路を再検査し完了。12対象の提示欠落なし |
 | 報酬→カード選択 / learn | EVSEED0087のNEOWS_BONESで公開報酬の親ID→grant/upgrade→現Mentor→Map、exit0・回収済み |
 | 公開数値の比較 | 基本走査で149経路の記録フィールドが一致。付与値が異なった5経路を原因修正後に同入力再生し5/5一致 |
-| 回帰試験 | lab Python149件、learn側C#47固有case、Python例5件通過。C#ホスト・native modは警告/エラー0 |
 | 通常ショップの追加検査 | native5種は実購入→Mentor子選択→効果・在庫消費→Map。learnは5種＋任意0枚の2件で同処理を確認し、別出力の7件で公開MoveToから次の戦闘部屋への実入場まで確認 |
-| Crystal画像認識の実接続 | native3判断中2判断で画像認識し、同じ公開状態の画像なし基準と2回異なる操作。実Weak Potion取得後Mapへ退出。learnは6回の発掘＋7回の実報酬操作でMap、5境界で画像認識。金100→130、deck10→13、WAR_PAINT取得 |
-| 追補Python回帰試験 | Mentor68、STS2共通6、learn27、native19、transport8、イベント30の計158件通過 |
-| 追補C#回帰試験 | Shop10、Crystal13、既存Bundle1、既存CardOrRelicSet3の計27件通過。外側の部屋Taskが残る場合にも、購入の束選択・カスタム報酬は購入Taskを先に再開して在庫を確定する |
+| Crystalの公開内容による実接続 | nativeは3判断で実Weak Potion取得後Map、learnは14操作で実報酬を経てMap。両環境で全Crystal境界の未開セル＝座標のみ、開セル＝座標＋content、盤面の完全分割を検査 |
+| Python回帰試験 | Mentor69、STS2共通6、learn24、native19、transport8、イベント30の計156件通過 |
+| C#回帰試験 | Shop10、既存Crystal3、公開セル投影12、既存Bundle1、既存CardOrRelicSet3の計29件通過。外側の部屋Taskが残る場合にも、購入の束選択・カスタム報酬は購入Taskを先に再開して在庫を確定する |
 
 基本走査のFutureはポーションなしでIsAllowed=false。nativeの単一PROCEEDとlearnの自動Mapは終了UIの差であり、昇格効果の検証には数えない。2ポーションを持つ3構成で別途検査した。通常登録外TheArchitectを基本走査がunsupported_fixtureとする行は、専用Act3検査と区別する。
 
@@ -93,19 +92,19 @@ completedはイベント退出後のMapまたは実終端へ到達し、ホス�
 - 静的調査: local/events/ancient-public-choices-review-20261026.corrected.json、local/events/random-relic-closure-review-20261026.json。
 - 通常ショップ5種: local/events/learn-shop-five-verification-20261026.json、local/events/native-shop-five-verification-20261026.json。Dolly複製1枚、HammerのSHARP3を3枚、KifudaのADROIT3を3枚、PunchのMOMENTUM5、RoyalのROYALLY_APPROVED1を実カードinstanceで照合。learnのHammer/Kifudaは0枚も購入完了を確認。
 - learn通常ショップの実退出: local/events/learn-shop-exit-verification-20261026.json。
-- Crystal画像入力と認識: local/events/native-crystal-visible-verification-20261026.json、local/events/native-crystal-vision-verification-20261026.json、local/events/learn-crystal-fragments-public-20261026-004/report.json、local/events/learn-crystal-vision-completion-20261026/report.json。
-- 追補の回帰・独立レビュー: local/events/followup-python-tests-final-20261026.log、local/events/native-followup-review-20261026.json。画像が違えば選択が変わること、同じ可視画像なら私的配置情報の追加に対して認識・判断が不変であること、曖昧な画像を保留することはPythonの局所試験で確認。
+- Crystal公開セルの実接続: local/events/native-crystal-masked-verification-20261026.json、local/events/learn-crystal-contents-completion-20261026/report.json。nativeのこのseedで観測した分類はempty/potion/card_reward。全6分類は実アイテム変種を使ったC#検査で確認。
+- 公開内容の回帰: local/events/crystal-content-python-tests-20261026.log、local/events/learn-crystal-cell-content-tests-20261026.log。C#は未開Itemや全Items・実原点・サイズ等のgetterが呼ばれると失敗する試験を含む。Pythonは未開内容の変更に対する入力・判断不変、gold/potionの大きさの曖昧性、同型隣接の保留を確認。
 - 購入の親Task順序: local/events/learn-shop-parent-order-repro-affordable-20261026.log、local/events/learn-crystal-shop-parent-fixed-20261026.log。実SCROLL_BOXES/Orrery購入と、部屋退出を待つ未完了Taskを使った回帰。旧順序のTimeoutを再現し修正後に通過した。自然ランの復元で同じ故障が発生したと主張する検査ではない。
 
-### Crystalの画像と認識の境界
+### Crystalの公開セルと正解マップの境界
 
-両backendは同じCrystalSphereProjectionを使い、配布物の画像・scene・shaderからアイテム絵を再構成し、発掘済みセルだけ57×57 RGBAで返す。背景、霧の境界、アニメーションを省いた表現であり、実スクリーンショットとの全画素一致を認定したものではない。未発掘セルのItem、盤面全体のItems一覧、実アイテムの型・原点・サイズ・UV・group IDは出力しない。
+両backendは同じCrystalSphereProjectionを使う。各セルのIsHiddenを先に確認し、開いたセルだけItemの型から内容を取り出す。hiddenCellsは{col,row}、revealedCellsは{col,row,content}で、contentはempty/gold/potion/card_reward/relic/curse。画像資産・描画・画像辞書・追加の起動設定は不要。
 
-visualTemplatesは全ラン共通の10画像と既知サイズの辞書で、実盤面を引数に取らない。Mentorのcrystal_vision.pyはvisibleFragmentsとこの辞書だけを使う。部分画像が複数の位置や呪い/報酬に一致する場合は断定せず、矛盾する矩形も採用しない。未判別部分には新規セル数の基準を使う。診断のvision.recognizedとselectedScoreで、実認識と選択根拠を確認できる。
+環境は正解配置を保持するが、未開セルの内容、盤面全体のItems一覧、個体ID、アイテムの原点・全体サイズ・rarityは出力しない。開いたセルの内容を知ることと、そこに触れるアイテム全体の配置を知ることを区別する。未知の公開型はemptyへ代替せず明示的に停止する。
 
-画像辞書とcropを同じ描画処理で作ることは、照合入力の整合性を保証する。実表示の再構成の根拠は別途scene/shader/実DLLの照合であり、同じ描画関数同士の比較だけで実表示への正しさを主張しない。学習済み画像モデルや新しいRustビルドは追加していない。
+Mentorのcrystal.pyは公開セルの内容だけを使用する。既知の形状について、空セルを含む全公開内容に矛盾しない配置を列挙し、境界を一意に推測できる場合だけ採点へ使う。金は1×1/2×1、ポーションは1×3/2×2の両候補を残す。同型の隣接セルを同一アイテムと断定しない。曖昧な部分には新規セル数の基準を使う。inference.inferredItemsとselectedScoreが推測と選択の診断情報であり、環境から得た正解範囲ではない。
 
-nativeは実ゲームの固定10画像を直接ロードする。learnでは同じ配布物から取得したcatalog.jsonのディレクトリを--crystal-assetsで明示する。診断モードのfixture:crystal_assetsは盤面に依存せず10画像をprofile配下へ書き出し、結果のcatalogパスを返す。そのファイルを画像ディレクトリのcatalog.jsonとして用いる。今回の抽出物はlocal/events/crystal-assets-v111/catalog.jsonに保持する。catalogにゲーム版・DLL hash・各画像hashを持たせ、batchの再実行記録にもcatalog全体のSHA-256を保存する。設定なし・画像不足を空の正解盤面へ置き換えず、画像能力の欠損を明示する。
+この観測は、開いたセルの中身を直接扱う記号表現である。スクリーンショットの断片から種類が判別できるかを再現する入力ではない。未開セルの内容を学習入力・方策へ渡さないことを検査する。
 
 ### 追加選択を提示する再現条件
 
@@ -131,7 +130,7 @@ learnの12対象は、除去枚数、強化枚数、CLONE量4、CLAWSのMAUL6枚
 - tests/events/catalog.jsonは対象DLLのModelDb登録から作成。optionStringLiteralsは合法分岐数ではない。基本型・非推奨・Mockは除外。
 - エンシェントの直接候補102種を対象版資料と実DLLで確認。全300レリックの選択API呼出しも静的照合した。Shop限定のDOLLYS_MIRROR、GNARLED_HAMMER、KIFUDA、PUNCH_DAGGER、ROYAL_STAMPは通常ショップで別途実購入検査した。Fake Merchantは専用の偽物9種から6種であり、この5種を含まない。
 - IsAllowedの記録と直接入場は、自然生成のpool・epoch・既出イベント条件の検査とは別。WarHistorianRepyは登録されるが対象DLLのIsAllowedはfalse。マルチプレイ、他キャラクター、他Ascension、全デッキ/乱数結果は未検証。
-- CrystalのvisibleItemsは実アイテム一覧として使用しない。画像片と固定辞書による部分画像の認識・判断接続までが対象で、未知の表現・全配置・実スクリーンショット一般の認識保証ではない。
+- Crystalは開いたセルの内容を投影する。未開セルの内容・同型セル間の個体境界を実装から取得しない。全配置・全状態組合せの操作検証ではない。
 - 現PPOはv0.111語彙を拡張した旧重み。対象版向け学習なし、新ID埋め込みは旧未知IDからの初期値。操作の通過は、効果をモデルが正しく評価する証拠ではない。
 - 物理的に別個の同IDカードの価値差、全カード・対象別の戦闘preview、終了済み保存のWinTime=0からの勝利復元は未検証。
 - 既存EventOptionSweepはChooseEventOptionだけを数え、shop面を網羅しない。今回の専用検査の代用にしない。
@@ -141,7 +140,7 @@ learnの12対象は、除去枚数、強化枚数、CLONE量4、CLAWSのMAUL6枚
 
 - ゲームDLL SHA-256: 9cb4f1ad8c9f284aa8fec3122ffd6d780bbf543d875c817abdd12ff63fbf12b4。
 - PPO SHA-256: b8bb1c85a497598bfa3430ad14b9bf5ca2335c7f3cf4b81101527098ceaa76c8。拡張build: f79727f1fd49a8e22e8403084b1a82210c82b2ae。
-- learnの最終Gitlinkはb32c488。ショップ5種の最初の実接続、Crystal画像・認識の実接続、最終の購入Task順序修正では実行断面が異なるため、各記録のruntime/source hashを参照する。元GHQ cloneは変更していない。
+- learnの最終Gitlinkは8cec593。ショップ5種、購入Task順序修正、Crystal公開セル形式の実接続では実行断面が異なるため、各記録のruntime/source hashを参照する。元GHQ cloneは変更していない。公開セル形式ではRecorder・TUI・fixtureのビルドも確認した。
 - tests/events/run.pyの各case.jsonにsource hash、実際の初期状態、policy identity、入力・後状態・終了情報を保存。専用probeの記録形式は個別のverification/reportを参照する。fixture=true・expertData=falseであり、教師データへ混ぜない。
 
 ```bash
@@ -155,6 +154,6 @@ uv run --offline --no-project python -B tests/events/run.py \
 # TheArchitectは --include-special --events TheArchitect とact-three.jsonを指定する。
 ```
 
-検査後、共有専用アプリのmodを開始前の正確なバイト列へ戻した。mainのmanifest・ソースは変更していない。通常入口でNeow、diagnosticFixture=false、exit0、回収済み、未確認エラー0を確認した。最終追補の証拠はlocal/native_headless/runtime-restoration-crystal-vision-20261026.json。このブランチのnativeコードを再実行する際はnative-buildでこの断面へ切り替える。最終fixture DLLはlocal/native_headless/fixture-runtime-crystal-vision-20261026へ保存。元のイベント検査と追補前の復旧記録もlocal/内に保持する。
+検査後、共有専用アプリのmodを開始前の正確なバイト列へ戻した。mainのmanifest・ソースは変更していない。通常入口でNeow、diagnosticFixture=false、exit0、回収済み、未確認エラー0を確認した。最終証拠はlocal/native_headless/runtime-restoration-crystal-masked-20261026.json。このブランチのnativeコードを再実行する際はnative-buildでこの断面へ切り替える。最終fixture DLLはlocal/native_headless/fixture-runtime-crystal-masked-20261026へ保存。元のイベント検査と追補前の復旧記録もlocal/内に保持する。
 
 新しいゲームアプリのコピー・ランタイム導入はない。コードと文書のみローカルコミットし、push・PR作成・mainへの統合はしていない。

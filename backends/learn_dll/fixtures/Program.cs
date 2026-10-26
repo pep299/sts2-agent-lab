@@ -13,9 +13,8 @@ catch (Exception error) { Console.Error.WriteLine(error); return 1; }
 
 static int Serve(string[] args, TextWriter output)
 {
-    if (args.Length is not (4 or 6) || args[0] != "--host-dir" || args[2] != "--log"
-        || args.Length == 6 && args[4] != "--crystal-assets")
-        throw new ArgumentException("--host-dir <既存Sts2DllRecorderの出力先> --log <新しいJSONL> [--crystal-assets <canonical RGBA directory>]");
+    if (args.Length != 4 || args[0] != "--host-dir" || args[2] != "--log")
+        throw new ArgumentException("--host-dir <既存Sts2DllRecorderの出力先> --log <新しいJSONL>");
     string directory = Path.GetFullPath(args[1]);
     string log = Path.GetFullPath(args[3]);
     string gamePath = Path.Combine(directory, "sts2.dll");
@@ -35,7 +34,6 @@ static int Serve(string[] args, TextWriter output)
     harness.GetType("Lts2.Harness.GameRuntime", true)!.GetMethod("EnsureInitialized")!.Invoke(null, null);
     Directory.CreateDirectory(Path.GetDirectoryName(log)!);
     using var recorder = (IDisposable)Activator.CreateInstance(recorderAssembly.GetType("DllRecorder", true)!, log)!;
-    if (args.Length == 6) Call(recorder, "ConfigureCrystalAssets", Path.GetFullPath(args[5]));
     var json = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     var db = game.GetType("MegaCrit.Sts2.Core.Models.ModelDb", true)!;
     var registered = Events(db);

@@ -1,7 +1,37 @@
-"""公開画像で確定した報酬・呪いと、新しく開くセル数を比較する基準方策。"""
+"""開いたセルの内容と、新しく開くセル数を使う基準方策。"""
 
-from agents.mentor.crystal_vision import recognize
 from sts2.observation import Unsupported, metadata
+
+
+SHAPES = {'gold': ((1, 1), (2, 1)), 'potion': ((1, 3), (2, 2)),
+          'card_reward': ((2, 2),), 'relic': ((4, 4),), 'curse': ((2, 2),)}
+
+
+def infer_items(board, revealed):
+    contents = {(c['col'], c['row']): c['content'] for c in board['revealedCells']}
+    if any(content not in {'empty', *SHAPES} for content in contents.values()):
+        raise Unsupported('Crystal Sphereの公開セル内容が不明')
+    hypotheses = {point: set() for point, kind in contents.items() if kind != 'empty'}
+    for kind, shapes in SHAPES.items():
+        for w, h in shapes:
+            for y in range(board['height'] - h + 1):
+                for x in range(board['width'] - w + 1):
+                    covered = {p for p in revealed if x <= p[0] < x + w and y <= p[1] < y + h}
+                    if not covered or any(contents[p] != kind for p in covered):
+                        continue
+                    for point in covered:
+                        hypotheses[point].add((x, y, w, h, kind))
+    certain = {next(iter(matches)) for matches in hypotheses.values() if len(matches) == 1}
+    occupied = {item: {(x, y) for x in range(item[0], item[0] + item[2])
+                       for y in range(item[1], item[1] + item[3])} for item in certain}
+    conflicts = {a for a in certain for b in certain if a != b and occupied[a] & occupied[b]}
+    items = [{'col': x, 'row': y, 'widthCells': w, 'heightCells': h, 'kind': kind,
+              'curse': kind == 'curse', 'remaining': occupied[x, y, w, h, kind] - revealed}
+             for x, y, w, h, kind in sorted(certain - conflicts)]
+    return items, {'method': 'public_cell_contents_and_known_shapes',
+        'ambiguousOrUnknownCells': sum(len(matches) != 1 for matches in hypotheses.values()),
+        'inferredItems': [{k: v for k, v in item.items() if k != 'remaining'} |
+                          {'remainingCells': len(item['remaining'])} for item in items]}
 
 
 def choose(observation):
@@ -45,7 +75,7 @@ def choose(observation):
     if not clicks:
         raise Unsupported('Crystal Sphereの公開クリック候補がない')
 
-    items, vision = recognize(board, revealed)
+    items, inference = infer_items(board, revealed)
 
     # 実ゲームのhover/CellClickedと同じ公開footprint: Bigは周囲8セル＋中心、Smallは中心。
     def footprint(point, tool):
@@ -70,8 +100,8 @@ def choose(observation):
     if best_tool != tool:
         chosen = tools[best_tool]
     return {'action_id': chosen['id']}, {
-        'source': 'fixed_public_crystal_templates' if items else 'fixed_public_crystal_coverage',
+        'source': 'fixed_public_crystal_contents' if items else 'fixed_public_crystal_coverage',
         'rule': 'avoid_known_curse_completion; complete_reward; advance_reward; new_cells; keep_tool; row,col',
         'currentTool': tool, 'selectedTool': best_tool,
         'maxNewCellsWithCurrentTool': max(len(footprint(p, tool)) for _, p in clicks),
-        'selectedScore': list(best), 'itemVisualsUsed': bool(vision['available']), 'vision': vision}
+        'selectedScore': list(best), 'inference': inference}

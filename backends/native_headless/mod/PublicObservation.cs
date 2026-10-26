@@ -118,8 +118,6 @@ public static class PublicObservation
             deckCards = player.Deck.Cards.OrderBy(Cards.SortKey, StringComparer.Ordinal).Select((card, index) => new { index, cardDetails = Card(card) }).ToArray(),
             map = PublicData.Map(run), combat = combatView, room = new { type = run.CurrentRoom?.GetType().Name, id = P(run.CurrentRoom, "ModelId")?.ToString() } };
         var unavailable = new Dictionary<string, string> { ["intentIcons"] = "headless renderer", ["renderedCardText"] = "template and existing dynamic variables only" };
-        if (context is SpecialChoiceContext { CrystalSphereVisualsUnavailable: { } visualError })
-            unavailable["crystalSphereVisualItems"] = visualError;
         return new { state = new { phase = Phase(raw.Phase), status, hand, enemies = active ? Enemies(CombatManager.Instance!.DebugOnlyGetState()!) : Array.Empty<object>(), offers,
                 shop = raw.Phase == "shop" && context is MerchantChoiceContext merchant ? new { inventoryOpen = merchant.InventoryOpen } : null,
                 selection, eventId = raw.Phase == "event" ? raw.Room?.Details.GetValueOrDefault("event_id") : null,

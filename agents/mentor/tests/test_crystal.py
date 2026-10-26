@@ -16,8 +16,7 @@ def observation(tool='Big', hidden=None):
     hidden = cells if hidden is None else set(hidden)
     board = {'width': 3, 'height': 3, 'tool': tool, 'divinationsLeft': 3,
              'hiddenCells': [{'col': x, 'row': y} for x, y in sorted(hidden)],
-             'revealedCells': [{'col': x, 'row': y} for x, y in sorted(cells - hidden)],
-             'visibleItems': []}
+             'revealedCells': [{'col': x, 'row': y, 'content': 'empty'} for x, y in sorted(cells - hidden)]}
     actions = [{'id': f'cell:{x}:{y}', 'kind': 'crystal_sphere_click',
                 'detail': {'metadata': {'col': x, 'row': y}}} for x, y in sorted(hidden)]
     other = 'Small' if tool == 'Big' else 'Big'
@@ -48,7 +47,7 @@ class PublicCrystalPolicy(unittest.TestCase):
         response, info = choose(obs)
         self.assertEqual(response, {'action_id': 'cell:1:1'})
         self.assertEqual(info['maxNewCellsWithCurrentTool'], 9)
-        self.assertFalse(info['itemVisualsUsed'])
+        self.assertEqual(info['inference']['inferredItems'], [])
         self.assertEqual(obs, original)
 
     def test_switches_to_big_only_when_it_can_open_more_hidden_cells(self):

@@ -19,7 +19,6 @@ public sealed class SpecialChoiceContext
     public IReadOnlyList<IReadOnlyList<CardModel>>? Bundles { get; init; }
     public IReadOnlyList<RelicModel>? Relics { get; init; }
     public object? CrystalSphere { get; init; }
-    public string? CrystalSphereVisualsUnavailable { get; init; }
 }
 
 public static class SpecialChoices

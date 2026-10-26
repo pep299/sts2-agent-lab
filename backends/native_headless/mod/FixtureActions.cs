@@ -9,7 +9,6 @@ using MegaCrit.Sts2.Core.Nodes.Screens;
 using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.Merchant;
-using Godot;
 
 namespace Sts2.NativeSim.FullAppBridge;
 
@@ -37,7 +36,7 @@ public static class FixtureActions
     public static void Add(List<LegalActionDto> actions, string phase)
     {
         if (!Enabled || phase is not ("event" or "combat")) return;
-        var names = phase == "combat" ? new[] { "combat_potion" } : new[] { "grid2", "bundle", "relic", "potions", "draw_order", "merchant", "crystal_assets" };
+        var names = phase == "combat" ? new[] { "combat_potion" } : new[] { "grid2", "bundle", "relic", "potions", "draw_order", "merchant" };
         foreach (var name in names)
             actions.Add(new LegalActionDto { ActionId = "fixture:" + name, ActionType = "fixture", Description = "Diagnostic native fixture: " + name });
         if (phase == "event") foreach (var id in shopRelics)
@@ -48,13 +47,7 @@ public static class FixtureActions
         if (!Enabled) throw new NotSupportedException("Fixture inputs disabled");
         var player = LocalContext.GetMe(RunManager.Instance!.DebugOnlyGetState())!;
         var cards = player.Deck.Cards.Take(4).ToList();
-        if (action == "fixture:crystal_assets")
-        {
-            string output = Path.GetFullPath(Path.Combine(OS.GetUserDataDir(), "diagnostic-crystal-assets.json"));
-            File.WriteAllText(output, NativeCrystalAssets.CatalogJson);
-            LastResult = new() { ["fixture"] = "crystal_assets", ["catalog"] = output, ["count"] = 10 };
-        }
-        else if (action == "fixture:merchant" || action.StartsWith("fixture:merchant:", StringComparison.Ordinal))
+        if (action == "fixture:merchant" || action.StartsWith("fixture:merchant:", StringComparison.Ordinal))
         {
             string? id = action == "fixture:merchant" ? null : action["fixture:merchant:".Length..];
             if (id != null && !shopRelics.Contains(id)) throw new NotSupportedException("Unknown merchant fixture relic");
