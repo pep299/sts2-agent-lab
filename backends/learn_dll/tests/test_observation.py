@@ -56,30 +56,36 @@ class LearnContract(unittest.TestCase):
 
     def test_gold_reward_is_not_a_card_reward(self):
         obs = base()
-        obs['state']['rewards'] = {'rewards': [{'taken': False, 'cards': None, 'potionId': None,
-                                             'gold': 12, 'relicId': None}]}
         obs['actions'] = [{'id': 'dll:0', 'kind': 'reward', 'detail': {
-            'nativeKind': 'TakeReward', 'cardDetails': None}}]
+            'nativeKind': 'TakeReward', 'cardDetails': None, 'rewardType': 'GoldReward', 'relicId': None}}]
         action = normalize_observation(obs)['actions'][0]
         self.assertNotIn('nativeKind', action['detail'])
         self.assertEqual(action['detail']['metadata']['reward_type'], 'Gold')
 
     def test_relic_reward_preserves_public_parent_identity(self):
         obs = base()
-        obs['state']['rewards'] = {'rewards': [{'taken': False, 'cards': None, 'potionId': None,
-                                             'gold': None, 'relicId': 'POMANDER'}]}
         obs['actions'] = [{'id': 'dll:0', 'kind': 'reward', 'detail': {
-            'nativeKind': 'TakeReward', 'cardDetails': None}}]
+            'nativeKind': 'TakeReward', 'cardDetails': None, 'rewardType': 'RelicReward', 'relicId': 'POMANDER'}}]
         meta = normalize_observation(obs)['actions'][0]['detail']['metadata']
         self.assertEqual(meta, {'reward_type': 'Relic', 'relic_id': 'POMANDER'})
 
+    def test_reward_action_order_does_not_depend_on_the_displayed_reward_order(self):
+        obs = base()
+        obs['state']['rewards'] = {'rewards': [{'gold': 12}, {'relicId': 'POMANDER'}]}
+        obs['actions'] = [{'id': str(i), 'kind': 'reward', 'detail': {
+            'nativeKind': 'TakeReward', 'cardDetails': None, 'rewardType': kind, 'relicId': relic}}
+            for i, (kind, relic) in enumerate((('RelicReward', 'POMANDER'), ('GoldReward', None)))]
+        actions = normalize_observation(obs)['actions']
+        self.assertEqual([a['detail']['metadata'] for a in actions],
+                         [{'reward_type': 'Relic', 'relic_id': 'POMANDER'}, {'reward_type': 'Gold'}])
+
     def test_bundle_shape_and_explicit_action_indices_match_native(self):
         obs = base()
-        obs['state'].update(phase='bundle_selection', bundles={'bundles': [[{'cardId': 'FIRST'}], [{'cardId': 'SECOND'}]]})
         cards = [[{'state': {'id': name, 'upgrade': 0, 'keywords': [], 'enchantment': None}}]
                  for name in ('FIRST', 'SECOND')]
+        obs['state'].update(phase='bundle_selection', bundles=cards)
         obs['actions'] = [{'id': f'dll:{i+8}', 'kind': 'choose_bundle', 'detail': {
-            'nativeKind': 'ChooseBundle', 'bundleIndex': i, 'bundleCards': cards[i]}} for i in (1, 0)]
+            'nativeKind': 'ChooseBundle', 'bundleIndex': i}} for i in (1, 0)]
         result = normalize_observation(obs)
         self.assertEqual(result['state']['bundles'], cards)
         self.assertEqual(result['actions'][0]['detail']['metadata'], {'bundle_index': 1})

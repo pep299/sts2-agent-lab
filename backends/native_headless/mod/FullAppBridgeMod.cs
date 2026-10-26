@@ -800,10 +800,8 @@ public static class FullAppBridgeMod
         await WaitHelper.ForNode<NMerchantRoom>(((SceneTree)Engine.GetMainLoop()).Root, "/root/Game/RootSceneContainer/Run/RoomContainer/MerchantRoom", ct, TimeSpan.FromSeconds(15));
         NMerchantRoom merchantRoom = (NMerchantRoom)((SceneTree)Engine.GetMainLoop()).Root.GetNode("/root/Game/RootSceneContainer/Run/RoomContainer/MerchantRoom");
 
-        merchantRoom.OpenInventory();
-        await WaitHelper.Until(() => merchantRoom.Inventory.IsOpen, ct, TimeSpan.FromSeconds(15), "Shop inventory did not open");
         if (await NativeMerchant.Handle(merchantRoom.Inventory, merchantRoom.MerchantButton, merchantRoom.ProceedButton,
-            () => HandleOfferedScreenAsync(random, ct), ct, allowClose: false))
+            () => HandleOfferedScreenAsync(random, ct), ct))
             throw new NotSupportedException("Unexpected combat transition in normal merchant room");
     }
 

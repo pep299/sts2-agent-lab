@@ -17,12 +17,11 @@ internal sealed class MerchantChoiceContext
 {
     public required IReadOnlyList<MerchantEntry> Entries { get; init; }
     public required bool InventoryOpen { get; init; }
-    public bool AllowClose { get; init; }
 
     public void AddControls(List<LegalActionDto> actions)
     {
         if (!InventoryOpen) actions.Add(new LegalActionDto { ActionId = "shop_open", ActionType = "shop_open", Description = "View merchant inventory" });
-        else if (AllowClose) actions.Add(new LegalActionDto { ActionId = "shop_close", ActionType = "shop_close", Description = "Close inventory and return to merchant" });
+        else actions.Add(new LegalActionDto { ActionId = "shop_close", ActionType = "shop_close", Description = "Close inventory and return to merchant" });
     }
 }
 
@@ -40,12 +39,12 @@ internal static class NativeMerchant
         CancellationToken.None, TimeSpan.FromSeconds(15), "Fake Merchant potion did not enter combat");
 
     public static async Task<bool> Handle(NMerchantInventory inventory, NMerchantButton merchant,
-        NProceedButton proceed, Func<Task<bool>> handleRewards, CancellationToken ct, bool allowClose = true)
+        NProceedButton proceed, Func<Task<bool>> handleRewards, CancellationToken ct)
     {
         while (GodotObject.IsInstanceValid(inventory) && CombatManager.Instance?.IsInProgress != true)
         {
             var slots = inventory.IsOpen ? inventory.GetAllSlots().Where(s => s.Entry != null).ToList() : new List<NMerchantSlot>();
-            var context = new MerchantChoiceContext { InventoryOpen = inventory.IsOpen, AllowClose = allowClose, Entries = slots.Select(s => s.Entry).ToList() };
+            var context = new MerchantChoiceContext { InventoryOpen = inventory.IsOpen, Entries = slots.Select(s => s.Entry).ToList() };
             string action = await FullAppBridgeServer.WaitForCoordinatorActionAsync("shop", false, false, context);
             if (action == "shop_combat_started") return true;
             if (action == "shop_open")
