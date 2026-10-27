@@ -1,0 +1,336 @@
+{
+  "gameHash": "9cb4f1ad8c9f284aa8fec3122ffd6d780bbf543d875c817abdd12ff63fbf12b4",
+  "events": [
+    {
+      "name": "AbyssalBaths",
+      "id": "EVENT.ABYSSAL_BATHS",
+      "category": "event"
+    },
+    {
+      "name": "Amalgamator",
+      "id": "EVENT.AMALGAMATOR",
+      "category": "event"
+    },
+    {
+      "name": "AromaOfChaos",
+      "id": "EVENT.AROMA_OF_CHAOS",
+      "category": "event"
+    },
+    {
+      "name": "BattlewornDummy",
+      "id": "EVENT.BATTLEWORN_DUMMY",
+      "category": "event"
+    },
+    {
+      "name": "BrainLeech",
+      "id": "EVENT.BRAIN_LEECH",
+      "category": "event"
+    },
+    {
+      "name": "Bugslayer",
+      "id": "EVENT.BUGSLAYER",
+      "category": "event"
+    },
+    {
+      "name": "ByrdonisNest",
+      "id": "EVENT.BYRDONIS_NEST",
+      "category": "event"
+    },
+    {
+      "name": "ColorfulPhilosophers",
+      "id": "EVENT.COLORFUL_PHILOSOPHERS",
+      "category": "event"
+    },
+    {
+      "name": "ColossalFlower",
+      "id": "EVENT.COLOSSAL_FLOWER",
+      "category": "event"
+    },
+    {
+      "name": "CrystalSphere",
+      "id": "EVENT.CRYSTAL_SPHERE",
+      "category": "event"
+    },
+    {
+      "name": "Darv",
+      "id": "EVENT.DARV",
+      "category": "ancient"
+    },
+    {
+      "name": "DenseVegetation",
+      "id": "EVENT.DENSE_VEGETATION",
+      "category": "event"
+    },
+    {
+      "name": "DollRoom",
+      "id": "EVENT.DOLL_ROOM",
+      "category": "event"
+    },
+    {
+      "name": "DoorsOfLightAndDark",
+      "id": "EVENT.DOORS_OF_LIGHT_AND_DARK",
+      "category": "event"
+    },
+    {
+      "name": "DrowningBeacon",
+      "id": "EVENT.DROWNING_BEACON",
+      "category": "event"
+    },
+    {
+      "name": "EndlessConveyor",
+      "id": "EVENT.ENDLESS_CONVEYOR",
+      "category": "event"
+    },
+    {
+      "name": "FakeMerchant",
+      "id": "EVENT.FAKE_MERCHANT",
+      "category": "event"
+    },
+    {
+      "name": "FieldOfManSizedHoles",
+      "id": "EVENT.FIELD_OF_MAN_SIZED_HOLES",
+      "category": "event"
+    },
+    {
+      "name": "GraveOfTheForgotten",
+      "id": "EVENT.GRAVE_OF_THE_FORGOTTEN",
+      "category": "event"
+    },
+    {
+      "name": "HungryForMushrooms",
+      "id": "EVENT.HUNGRY_FOR_MUSHROOMS",
+      "category": "event"
+    },
+    {
+      "name": "InfestedAutomaton",
+      "id": "EVENT.INFESTED_AUTOMATON",
+      "category": "event"
+    },
+    {
+      "name": "JungleMazeAdventure",
+      "id": "EVENT.JUNGLE_MAZE_ADVENTURE",
+      "category": "event"
+    },
+    {
+      "name": "LostWisp",
+      "id": "EVENT.LOST_WISP",
+      "category": "event"
+    },
+    {
+      "name": "LuminousChoir",
+      "id": "EVENT.LUMINOUS_CHOIR",
+      "category": "event"
+    },
+    {
+      "name": "MorphicGrove",
+      "id": "EVENT.MORPHIC_GROVE",
+      "category": "event"
+    },
+    {
+      "name": "Neow",
+      "id": "EVENT.NEOW",
+      "category": "ancient"
+    },
+    {
+      "name": "Nonupeipe",
+      "id": "EVENT.NONUPEIPE",
+      "category": "ancient"
+    },
+    {
+      "name": "Orobas",
+      "id": "EVENT.OROBAS",
+      "category": "ancient"
+    },
+    {
+      "name": "Pael",
+      "id": "EVENT.PAEL",
+      "category": "ancient"
+    },
+    {
+      "name": "PotionCourier",
+      "id": "EVENT.POTION_COURIER",
+      "category": "event"
+    },
+    {
+      "name": "PunchOff",
+      "id": "EVENT.PUNCH_OFF",
+      "category": "event"
+    },
+    {
+      "name": "RanwidTheElder",
+      "id": "EVENT.RANWID_THE_ELDER",
+      "category": "event"
+    },
+    {
+      "name": "Reflections",
+      "id": "EVENT.REFLECTIONS",
+      "category": "event"
+    },
+    {
+      "name": "RelicTrader",
+      "id": "EVENT.RELIC_TRADER",
+      "category": "event"
+    },
+    {
+      "name": "RoomFullOfCheese",
+      "id": "EVENT.ROOM_FULL_OF_CHEESE",
+      "category": "event"
+    },
+    {
+      "name": "RoundTeaParty",
+      "id": "EVENT.ROUND_TEA_PARTY",
+      "category": "event"
+    },
+    {
+      "name": "SapphireSeed",
+      "id": "EVENT.SAPPHIRE_SEED",
+      "category": "event"
+    },
+    {
+      "name": "SelfHelpBook",
+      "id": "EVENT.SELF_HELP_BOOK",
+      "category": "event"
+    },
+    {
+      "name": "SlipperyBridge",
+      "id": "EVENT.SLIPPERY_BRIDGE",
+      "category": "event"
+    },
+    {
+      "name": "SpiralingWhirlpool",
+      "id": "EVENT.SPIRALING_WHIRLPOOL",
+      "category": "event"
+    },
+    {
+      "name": "SpiritGrafter",
+      "id": "EVENT.SPIRIT_GRAFTER",
+      "category": "event"
+    },
+    {
+      "name": "StoneOfAllTime",
+      "id": "EVENT.STONE_OF_ALL_TIME",
+      "category": "event"
+    },
+    {
+      "name": "SunkenStatue",
+      "id": "EVENT.SUNKEN_STATUE",
+      "category": "event"
+    },
+    {
+      "name": "SunkenTreasury",
+      "id": "EVENT.SUNKEN_TREASURY",
+      "category": "event"
+    },
+    {
+      "name": "Symbiote",
+      "id": "EVENT.SYMBIOTE",
+      "category": "event"
+    },
+    {
+      "name": "TabletOfTruth",
+      "id": "EVENT.TABLET_OF_TRUTH",
+      "category": "event"
+    },
+    {
+      "name": "Tanx",
+      "id": "EVENT.TANX",
+      "category": "ancient"
+    },
+    {
+      "name": "TeaMaster",
+      "id": "EVENT.TEA_MASTER",
+      "category": "event"
+    },
+    {
+      "name": "Tezcatara",
+      "id": "EVENT.TEZCATARA",
+      "category": "ancient"
+    },
+    {
+      "name": "TheFutureOfPotions",
+      "id": "EVENT.THE_FUTURE_OF_POTIONS",
+      "category": "event"
+    },
+    {
+      "name": "TheLanternKey",
+      "id": "EVENT.THE_LANTERN_KEY",
+      "category": "event"
+    },
+    {
+      "name": "TheLegendsWereTrue",
+      "id": "EVENT.THE_LEGENDS_WERE_TRUE",
+      "category": "event"
+    },
+    {
+      "name": "ThisOrThat",
+      "id": "EVENT.THIS_OR_THAT",
+      "category": "event"
+    },
+    {
+      "name": "TinkerTime",
+      "id": "EVENT.TINKER_TIME",
+      "category": "event"
+    },
+    {
+      "name": "TrashHeap",
+      "id": "EVENT.TRASH_HEAP",
+      "category": "event"
+    },
+    {
+      "name": "Trial",
+      "id": "EVENT.TRIAL",
+      "category": "event"
+    },
+    {
+      "name": "UnrestSite",
+      "id": "EVENT.UNREST_SITE",
+      "category": "event"
+    },
+    {
+      "name": "Vakuu",
+      "id": "EVENT.VAKUU",
+      "category": "ancient"
+    },
+    {
+      "name": "WarHistorianRepy",
+      "id": "EVENT.WAR_HISTORIAN_REPY",
+      "category": "event"
+    },
+    {
+      "name": "WaterloggedScriptorium",
+      "id": "EVENT.WATERLOGGED_SCRIPTORIUM",
+      "category": "event"
+    },
+    {
+      "name": "WelcomeToWongos",
+      "id": "EVENT.WELCOME_TO_WONGOS",
+      "category": "event"
+    },
+    {
+      "name": "Wellspring",
+      "id": "EVENT.WELLSPRING",
+      "category": "event"
+    },
+    {
+      "name": "WhisperingHollow",
+      "id": "EVENT.WHISPERING_HOLLOW",
+      "category": "event"
+    },
+    {
+      "name": "WoodCarvings",
+      "id": "EVENT.WOOD_CARVINGS",
+      "category": "event"
+    },
+    {
+      "name": "ZenWeaver",
+      "id": "EVENT.ZEN_WEAVER",
+      "category": "event"
+    },
+    {
+      "name": "TheArchitect",
+      "id": "EVENT.THE_ARCHITECT",
+      "category": "special"
+    }
+  ],
+  "scope": "実v0.111 ModelDb登録65件。出現条件・全分岐は各fixtureの別結果で判定。"
+}

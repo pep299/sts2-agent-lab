@@ -20,11 +20,13 @@ using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Map;
 using MegaCrit.Sts2.Core.Modding;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Events;
 using MegaCrit.Sts2.Core.Multiplayer.Game.Lobby;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.Events;
+using MegaCrit.Sts2.Core.Nodes.Events.Custom;
 using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.Core.Nodes.Rewards;
 using MegaCrit.Sts2.Core.Nodes.Rooms;
@@ -76,6 +78,8 @@ public static class FullAppBridgeMod
         CardSelectBridge.Apply(harmony);
         SpecialChoices.Apply(harmony);
         NativeEventCompletion.Apply(harmony);
+        NativeRunOutcome.Apply(harmony);
+        FixtureActions.Apply(harmony);
 
         TryPatchPostfix(harmony, typeof(NGame), "LaunchMainMenu", nameof(OnMainMenuLaunched));
         TryPatchPrefix(harmony, typeof(StartRunLobby), "BeginRunForAllPlayersIfAllReady", nameof(OnBeginRunForAllPlayers));
@@ -670,6 +674,12 @@ public static class FullAppBridgeMod
     /// </summary>
     private static async Task<bool> HandleOfferedScreenAsync(Rng random, CancellationToken ct)
     {
+        if (await HandleRewardScreenAsync(random, ct)) return true;
+        return await SpecialChoices.Handle(ct, () => HandleRewardScreenAsync(random, ct));
+    }
+
+    internal static async Task<bool> HandleRewardScreenAsync(Rng random, CancellationToken ct)
+    {
         if (GetTopScreen<NCardRewardSelectionScreen>() != null)
         {
             await RunCardRewardLoopAsync(random, ct);
@@ -680,7 +690,6 @@ public static class FullAppBridgeMod
             await RunRewardsLoopAsync(random, ct);
             return true;
         }
-        if (await SpecialChoices.Handle(ct)) return true;
         return false;
     }
 
@@ -786,67 +795,14 @@ public static class FullAppBridgeMod
         return false;
     }
 
-    private static async Task RunShopRoomLoopAsync(Rng random, CancellationToken ct)
+    internal static async Task RunShopRoomLoopAsync(Rng random, CancellationToken ct)
     {
         await WaitHelper.ForNode<NMerchantRoom>(((SceneTree)Engine.GetMainLoop()).Root, "/root/Game/RootSceneContainer/Run/RoomContainer/MerchantRoom", ct, TimeSpan.FromSeconds(15));
         NMerchantRoom merchantRoom = (NMerchantRoom)((SceneTree)Engine.GetMainLoop()).Root.GetNode("/root/Game/RootSceneContainer/Run/RoomContainer/MerchantRoom");
 
-        merchantRoom.OpenInventory();
-        await Task.Delay(50);
-
-        while (true)
-        {
-            var inventory = merchantRoom.Inventory;
-            var allSlots = inventory.GetAllSlots().Where(s => s.Entry != null).ToList();
-
-            string actionId = await FullAppBridgeServer.WaitForCoordinatorActionAsync("shop", isTerminal: false, isVictory: false, allSlots.Select(s => s.Entry).ToList());
-
-            if (actionId == "shop_leave" || actionId == "proceed" || actionId.StartsWith("leave", StringComparison.OrdinalIgnoreCase))
-            {
-                var backBtn = UiHelper.FindFirst<NBackButton>(inventory);
-                if (backBtn != null)
-                {
-                    await UiHelper.Click(backBtn, 0);
-                }
-                break;
-            }
-            else if (actionId.StartsWith("shop_buy:", StringComparison.Ordinal))
-            {
-                string[] parts = actionId.Split(':');
-                int slotIdx = int.Parse(parts[1]);
-                if (slotIdx >= 0 && slotIdx < allSlots.Count)
-                {
-                    NMerchantSlot chosenSlot = allSlots[slotIdx];
-                    var player = LocalContext.GetMe(RunManager.Instance!.DebugOnlyGetState())!;
-                    if (!chosenSlot.Entry.EnoughGold || !chosenSlot.Entry.IsStocked || chosenSlot.Entry is MegaCrit.Sts2.Core.Entities.Merchant.MerchantPotionEntry && !player.HasOpenPotionSlots)
-                        throw new InvalidOperationException("Shop candidate is no longer purchasable");
-                    // Purchases can await a nested reward choice.
-                    Task buying = chosenSlot.Entry.OnTryPurchaseWrapper(inventory.Inventory);
-                    while (!buying.IsCompleted)
-                    {
-                        if (!await HandleOfferedScreenAsync(random, ct)) await Task.Delay(20);
-                    }
-                    await buying;
-                    await Task.Delay(50);
-                    while (await HandleOfferedScreenAsync(random, ct)) await Task.Delay(20);
-                }
-            }
-            else
-            {
-                var backBtn = UiHelper.FindFirst<NBackButton>(inventory);
-                if (backBtn != null)
-                {
-                    await UiHelper.Click(backBtn, 0);
-                }
-                break;
-            }
-        }
-
-        if (merchantRoom.ProceedButton != null)
-        {
-            await WaitHelper.Until(() => merchantRoom.ProceedButton.IsEnabled, ct, TimeSpan.FromSeconds(10), "Shop proceed button not enabled");
-            await UiHelper.Click(merchantRoom.ProceedButton, 0);
-        }
+        if (await NativeMerchant.Handle(merchantRoom.Inventory, merchantRoom.MerchantButton, merchantRoom.ProceedButton,
+            () => HandleOfferedScreenAsync(random, ct), ct))
+            throw new NotSupportedException("Unexpected combat transition in normal merchant room");
     }
 
     private static bool HandleEventRoomAsync(Rng random, CancellationToken ct, ref Task __result)
@@ -859,6 +815,14 @@ public static class FullAppBridgeMod
     {
         await WaitHelper.ForNode<Node>(((SceneTree)Engine.GetMainLoop()).Root, "/root/Game/RootSceneContainer/Run/RoomContainer/EventRoom", ct, TimeSpan.FromSeconds(15));
         Node eventRoom = ((SceneTree)Engine.GetMainLoop()).Root.GetNode("/root/Game/RootSceneContainer/Run/RoomContainer/EventRoom");
+        if (EventFixture.Pending)
+        {
+            await WaitHelper.Until(() => UiHelper.FindAll<NEventOptionButton>(eventRoom)
+                .Any(b => b.Option != null && b.IsVisibleInTree() && b.IsEnabled && !b.Option.IsLocked),
+                ct, TimeSpan.FromSeconds(15), "Initial event is not ready for fixture replacement");
+            await EventFixture.EnterAsync();
+            eventRoom = ((SceneTree)Engine.GetMainLoop()).Root.GetNode("/root/Game/RootSceneContainer/Run/RoomContainer/EventRoom");
+        }
 
         while (GodotObject.IsInstanceValid(eventRoom) && eventRoom.IsInsideTree())
         {
@@ -873,6 +837,24 @@ public static class FullAppBridgeMod
                 await RunCombatLoopAsync(random, ct);
                 await Task.Delay(100);
                 continue;
+            }
+
+            if (runState.BaseRoom is EventRoom { LocalMutableEvent: FakeMerchant fakeEvent })
+            {
+                var fake = fakeEvent.Node as NFakeMerchant ?? throw new NotSupportedException("Fake Merchant controls missing");
+                var proceed = fake.GetNode<NProceedButton>("%ProceedButton");
+                if (!fakeEvent.StartedFight)
+                {
+                    bool combatStarted = await NativeMerchant.Handle(fake.Inventory, fake.MerchantButton, proceed,
+                        () => HandleOfferedScreenAsync(random, ct), ct);
+                    if (combatStarted) continue;
+                }
+                else
+                {
+                    await WaitHelper.Until(() => proceed.IsEnabled, ct, TimeSpan.FromSeconds(15), "Fake Merchant proceed not ready");
+                    await UiHelper.Click(proceed, 0);
+                }
+                break;
             }
 
             var optionButtons = UiHelper.FindAll<NEventOptionButton>(eventRoom).Where(b => b.Option != null && b.IsVisibleInTree()).ToList();
@@ -916,13 +898,15 @@ public static class FullAppBridgeMod
             NativeEventCompletion.SetButtons(optionButtons);
             try { actionId = await FullAppBridgeServer.WaitForCoordinatorActionAsync("event", false, false, optionButtons.Select(b => b.Option).ToList()); }
             finally { NativeEventCompletion.SetButtons(null); }
+            if (actionId == "event_room_changed") break;
 
             int choiceIdx = int.Parse(actionId.Split(':')[1]);
             if (choiceIdx < 0 || choiceIdx >= optionButtons.Count || optionButtons[choiceIdx].Option.IsLocked || !optionButtons[choiceIdx].IsEnabled)
                 throw new InvalidOperationException("Event option changed before execution");
 
             NEventOptionButton chosenBtn = optionButtons[choiceIdx];
-            bool isProceed = chosenBtn.Option.IsProceed;
+            EventOption chosenOption = chosenBtn.Option;
+            bool isProceed = chosenOption.IsProceed;
 
             var eventManager = RunManager.Instance ?? throw new InvalidOperationException("Missing event run manager");
             Task eventEffect = await NativeEventCompletion.ClickAndCapture(chosenBtn, ct);
@@ -939,6 +923,7 @@ public static class FullAppBridgeMod
                 await eventEffect;
                 await eventManager.EventSynchronizer.AwaitPendingOptionTasks();
             }
+            await NativeEventCompletion.CompleteLethalProceedAsync(chosenOption, ct);
             // Native effects can finish before the room publishes its next controls.
             var tree = (SceneTree)Engine.GetMainLoop();
             for (int frame = 0; frame < 2; frame++)
@@ -1008,7 +993,7 @@ public static class FullAppBridgeMod
 
     private static async Task RunVictoryRoomLoopAsync(Rng random, CancellationToken ct)
     {
-        if (RunManager.Instance?.DebugOnlyGetState()?.IsGameOver != true || RunManager.Instance.WinTime <= 0)
+        if (RunManager.Instance?.DebugOnlyGetState() is not { } run || !NativeRunOutcome.IsVictory(run))
             throw new InvalidOperationException("Victory room reached without native victory confirmation");
         await FullAppBridgeServer.WaitForCoordinatorActionAsync("victory", isTerminal: true, isVictory: true);
     }
@@ -1022,7 +1007,7 @@ public static class FullAppBridgeMod
     private static async Task RunGameOverLoopAsync(Rng random, CancellationToken ct)
     {
         var run = RunManager.Instance?.DebugOnlyGetState();
-        bool victory = run?.IsGameOver == true && RunManager.Instance!.WinTime > 0;
+        bool victory = run != null && NativeRunOutcome.IsVictory(run);
         await FullAppBridgeServer.WaitForCoordinatorActionAsync("game_over", isTerminal: true, isVictory: victory);
     }
 

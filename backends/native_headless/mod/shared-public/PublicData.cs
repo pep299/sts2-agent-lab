@@ -34,21 +34,22 @@ public static class PublicData
         var title=Property(model,"Title");
         return title is string text?text:title==null?null:Call(title,"GetFormattedText")?.ToString();
     }
-    public static object[] DynamicVars(object model)
-    {
-        var vars=Property(model,"DynamicVars");
-        return Items(Property(vars,"Values")).OrderBy(v=>Required(v,"Name").ToString(),StringComparer.Ordinal)
+    private static object[] DynamicVarValues(object? vars) =>
+        Items(Property(vars,"Values")).OrderBy(v=>Required(v,"Name").ToString(),StringComparer.Ordinal)
             .Select(v=>(object)new{name=Required(v,"Name"),baseValue=Required(v,"BaseValue"),
                 enchantedValue=Required(v,"EnchantedValue"),previewValue=Required(v,"PreviewValue")}).ToArray();
-    }
+    public static object[] DynamicVars(object model)=>DynamicVarValues(Property(model,"DynamicVars"));
     public static object Card(object card)
     {
         var cost=Required(card,"EnergyCost");
+        var preview=Call(Required(card,"DynamicVars"),"Clone",card)!;
+        var mode=Enum.Parse(card.GetType().Assembly.GetType("MegaCrit.Sts2.Core.Entities.Cards.CardPreviewMode",true)!,"Normal");
+        Call(card,"UpdateDynamicVarPreview",mode,null,preview);
         return new{title=Title(card),type=Required(card,"Type").ToString(),rarity=Required(card,"Rarity").ToString(),
             targetType=Required(card,"TargetType").ToString(),rules=Localization(Required(card,"Description")),
             energyCost=new{canonical=Required(cost,"Canonical"),costsX=Required(cost,"CostsX"),current=Call(cost,"GetResolved")},
             starCost=new{current=Required(card,"CurrentStarCost"),costsX=Required(card,"HasStarCostX")},
-            dynamicVars=DynamicVars(card),retain=Required(card,"ShouldRetainThisTurn"),sly=Required(card,"IsSlyThisTurn")};
+            dynamicVars=DynamicVarValues(preview),retain=Required(card,"ShouldRetainThisTurn"),sly=Required(card,"IsSlyThisTurn")};
     }
     public static object Relic(object relic)=>new{id=Id(relic),title=Title(relic),
         rules=Localization(Required(relic,"Description")),dynamicVars=DynamicVars(relic),

@@ -15,8 +15,6 @@ def normalize_observation(observation):
         option['relic'] = option.get('relicId')
         option['text_key'] = option['textKey']
     actions = []
-    reward_rows = iter(r for r in (state.get('rewards') or {}).get('rewards', [])
-                       if not r['taken'] and r['cards'] is None)
     for action in obs['actions']:
         detail = action['detail']
         native = detail['nativeKind']
@@ -28,6 +26,9 @@ def normalize_observation(observation):
             meta = coord | {'room_type': node['roomType']}
         elif native == 'ChooseEventOption':
             meta = {'option_index': detail['eventOptionIndex']}
+        elif native == 'ChooseBundle':
+            action['kind'] = 'choose_bundle'
+            meta = {'bundle_index': detail['bundleIndex']}
         elif native == 'PlayCard':
             meta = {'card_index': detail['handIndex'], 'target_id': detail['target']}
         elif native == 'UsePotion':
@@ -41,15 +42,24 @@ def normalize_observation(observation):
                     'entry_type': {'Card': 'MerchantCardEntry', 'Relic': 'MerchantRelicEntry',
                                    'Potion': 'MerchantPotionEntry',
                                    'CardRemoval': 'MerchantCardRemovalEntry'}[detail['shopItemType']]}
+        elif native in ('OpenShop', 'CloseShop', 'LeaveShop'):
+            action['kind'] = {'OpenShop': 'shop_open', 'CloseShop': 'shop_close',
+                              'LeaveShop': 'shop_leave'}[native]
+        elif native == 'ClickCrystalSphereCell':
+            action['kind'] = 'crystal_sphere_click'
+            meta = {'col': detail['crystalSphereCol'], 'row': detail['crystalSphereRow']}
+        elif native == 'SetCrystalSphereTool':
+            action['kind'] = 'crystal_sphere_tool'
+            meta = {'tool': detail['crystalSphereTool']}
         elif native == 'TakeReward':
             if detail['cardDetails']:
                 c = card_state(detail)
                 meta = {'card_id': c['id'], 'upgrades': c['upgrade']}
             else:
-                reward = next(reward_rows)
-                meta['reward_type'] = ('Potion' if reward['potionId'] is not None else
-                                       'Gold' if reward['gold'] is not None else
-                                       'Relic' if reward['relicId'] is not None else 'Unknown')
+                meta['reward_type'] = {'PotionReward': 'Potion', 'GoldReward': 'Gold',
+                                       'RelicReward': 'Relic'}[detail['rewardType']]
+                if detail['relicId'] is not None:
+                    meta['relic_id'] = detail['relicId']
         elif native == 'ProceedFromRewards':
             action['kind'] = 'proceed'
         if native == 'SelectCards':

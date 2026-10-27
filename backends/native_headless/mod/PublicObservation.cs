@@ -92,7 +92,8 @@ public static class PublicObservation
                     metadata = m, cardDetails = card == null ? null : Card(card) } };
         }).ToArray();
         var offers = new List<object>();
-        if (raw.Phase == "shop" && context is IEnumerable<MerchantEntry> entries)
+        var merchantEntries = context is MerchantChoiceContext shop ? shop.Entries : context as IEnumerable<MerchantEntry>;
+        if (raw.Phase == "shop" && merchantEntries is { } entries)
         {
             int index = 0;
             foreach (var entry in entries)
@@ -104,7 +105,8 @@ public static class PublicObservation
                 index++;
             }
         }
-        var selection = context is CardSelectContext c ? new { min = c.MinSelect, max = c.MaxSelect, purpose = c.Purpose,
+        var selection = context is CardSelectContext c ? new { min = c.MinSelect, max = c.MaxSelect,
+            purpose = c.Purpose is "FromSimpleGridForRewards" or "FromDeckGeneric" or "FromChooseACardScreen" ? null : c.Purpose,
             cards = c.Cards.Select((card, index) => new { index, cardDetails = Card(card) }).ToArray() } : null;
         var hand = active ? PileType.Hand.GetPile(player).Cards.Select((card, index) => (object)new { index, id = PublicData.Id(card), title = PublicData.Title(card),
             cost = card.EnergyCost.CostsX ? "X" : card.EnergyCost.GetResolved().ToString(), targetType = card.TargetType.ToString(), cardDetails = Card(card), canPlay = card.CanPlay() }).ToArray() : Array.Empty<object>();
@@ -115,7 +117,9 @@ public static class PublicObservation
             potions = player.Potions.Select(p => PublicData.Id(p)).ToArray(), relics = player.Relics.Select(PublicData.Id).ToArray(), relicDetails = player.Relics.Select(PublicData.Relic).ToArray(),
             deckCards = player.Deck.Cards.OrderBy(Cards.SortKey, StringComparer.Ordinal).Select((card, index) => new { index, cardDetails = Card(card) }).ToArray(),
             map = PublicData.Map(run), combat = combatView, room = new { type = run.CurrentRoom?.GetType().Name, id = P(run.CurrentRoom, "ModelId")?.ToString() } };
+        var unavailable = new Dictionary<string, string> { ["intentIcons"] = "headless renderer", ["renderedCardText"] = "template and existing dynamic variables only" };
         return new { state = new { phase = Phase(raw.Phase), status, hand, enemies = active ? Enemies(CombatManager.Instance!.DebugOnlyGetState()!) : Array.Empty<object>(), offers,
+                shop = raw.Phase == "shop" && context is MerchantChoiceContext merchant ? new { inventoryOpen = merchant.InventoryOpen } : null,
                 selection, eventId = raw.Phase == "event" ? raw.Room?.Details.GetValueOrDefault("event_id") : null,
                 options = raw.Phase == "event" ? EventOptions(raw.Room?.Details.GetValueOrDefault("options")) : null,
                 text = raw.Phase == "event" ? DisplayedEventText() : null,
@@ -123,15 +127,16 @@ public static class PublicObservation
                 treasure = raw.Phase == "treasure" && context is IReadOnlyList<RelicModel> treasures ? treasures.Select(PublicData.Relic).ToArray() : null,
                 rest = raw.Phase == "rest_site" ? Items(context).Select(option => new { id = R(option, "OptionId"), title = PublicData.Localization(R(option, "Title")),
                     description = PublicData.Localization(R(option, "Description")), enabled = R(option, "IsEnabled") }).ToArray() : null,
-                bundles = context is SpecialChoiceContext { Bundles: not null } bundleChoice ? bundleChoice.Bundles.Select((bundle, index) => new { index, cards = bundle.Select(card => Card(card)).ToArray() }).ToArray() : null,
+                bundles = context is SpecialChoiceContext { Bundles: not null } bundleChoice ? bundleChoice.Bundles.Select(bundle => bundle.Select(card => Card(card)).ToArray()).ToArray() : null,
                 relicChoices = context is SpecialChoiceContext { Relics: not null } relicChoice ? relicChoice.Relics.Select(PublicData.Relic).ToArray() : null,
+                crystalSphere = (context as SpecialChoiceContext)?.CrystalSphere,
                 terminal = raw.IsTerminal ? raw.IsVictory ? "victory" : "death" : null }, actions,
             publicHistory = new { coverage = "current_recorded_segment_only", shopOffers = OfferHistory.Values.ToArray() },
             resolution = new { evidence = "native_coordinator_boundary", pendingChoice = selection != null || context is SpecialChoiceContext, parentEffectMayBePending = selection != null || context is SpecialChoiceContext },
             capabilities = new { backend = "native_headless", gameVersion = "v0.111.0", observationRevision = "public-state-v3", renderedCardText = false,
                 diagnosticFixture = FixtureActions.Enabled, diagnosticFixtureResult = FixtureActions.Enabled ? FixtureActions.LastResult : null,
                 explicitMultiCardIndices = true, supportedCharacters = new[] { "IRONCLAD" }, supportedAscensions = new[] { 0 },
-                unavailable = new Dictionary<string, string> { ["intentIcons"] = "headless renderer", ["renderedCardText"] = "template and existing dynamic variables only" } } };
+                unavailable } };
     }
     private static object[] EventOptions(object? descriptions)
     {
@@ -140,8 +145,10 @@ public static class PublicObservation
         return options.Select(option => (object)new Dictionary<string, object?>(option)
             { ["enabled"] = NativeEventCompletion.IsButtonReady(Convert.ToInt32(option["index"])) }).ToArray();
     }
+    internal static RelicModel? RewardRelic(object reward) => (P(reward, "Relic")
+        ?? (reward.GetType().Name == "RelicReward" ? PublicData.Field(reward, "_relic") : null)) as RelicModel;
     private static object[] DescribeRewards(object? context) => Items(context).Select((r, index) => (object)new { index, type = r.GetType().Name,
         amount = P(r, "Amount"), potion = P(r, "Potion") is object p ? PublicData.Potion(p) : null,
         description = P(r, "Description") is object description ? PublicData.Call(description, "GetFormattedText") : null,
-        relic = (P(r, "Relic") ?? (r.GetType().Name == "RelicReward" ? PublicData.Field(r, "_relic") : null)) is object relic ? PublicData.Relic(relic) : null }).ToArray();
+        relic = RewardRelic(r) is { } relic ? PublicData.Relic(relic) : null }).ToArray();
 }

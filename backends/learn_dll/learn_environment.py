@@ -22,7 +22,8 @@ class LearnEnvironment:
         self.output.mkdir(parents=True, exist_ok=False)
         self.stderr = (self.output / 'host-stderr.log').open('x')
         try:
-            self.process = subprocess.Popen([str(dotnet), str(host), '--log', str(self.output / 'events.jsonl')],
+            command = [str(dotnet), str(host), '--log', str(self.output / 'events.jsonl')]
+            self.process = subprocess.Popen(command,
                     cwd=root, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.stderr, bufsize=0)
         except BaseException:
             self.stderr.close()

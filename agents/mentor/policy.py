@@ -5,6 +5,7 @@ import sys
 import time
 
 from agents.mentor.combat import make_wire, match_action, resolve, wire_cards
+from agents.mentor.crystal import choose as choose_crystal
 from agents.mentor.nested_combat import align_choice, resume_choice, search_indices
 from agents.mentor.noncombat import NoncombatPolicy, UnscoredSelection, card, strategic_actions
 from agents.mentor.runtime import MentorRuntime
@@ -83,6 +84,8 @@ class Mentor:
                     'replay': replay_info,
                     'world_generated_options': generative, 'hidden_info': 'beliefdraw',
                     'choice_constraint': 'choose_one_curse_even_when_selector_allows_empty' if curse_subset else None}
+        elif observation['state']['phase'] == 'crystal_sphere':
+            response, info = choose_crystal(dict(observation, actions=actions))
         elif len(actions) == 1 and actions[0]['id'] != 'choose_cards:':
             response, info = {'action_id': actions[0]['id']}, {'source': 'single_candidate'}
         elif observation['state']['phase'] == 'combat':
@@ -119,6 +122,7 @@ class Mentor:
                     seconds=time.monotonic()-started, response=response,
                     discard_potion_policy='keep',
                     out_of_combat_potion_policy='keep',
+                    excluded_shop_close_candidates=sum(a['kind'] == 'shop_close' for a in observation['actions']),
                     excluded_discard_candidates=sum(a['kind'] == 'discard_potion' for a in observation['actions']))
         print(json.dumps(info, ensure_ascii=False), file=sys.stderr, flush=True)
         return response
