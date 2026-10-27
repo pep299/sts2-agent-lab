@@ -19,9 +19,13 @@ public static class FixtureActions
     public static Dictionary<string, object?> LastResult { get; private set; } = new();
     private static readonly string[] shopRelics = ["DOLLYS_MIRROR", "GNARLED_HAMMER", "KIFUDA", "PUNCH_DAGGER", "ROYAL_STAMP"];
     private static string? pendingShopRelic;
-    public static void Apply(Harmony harmony) => harmony.Patch(
-        AccessTools.Method(typeof(MerchantInventory), nameof(MerchantInventory.CreateForNormalMerchant)),
-        postfix: new HarmonyMethod(typeof(FixtureActions), nameof(ReplaceShopRelic)));
+    public static void Apply(Harmony harmony)
+    {
+        if (!Enabled) return;
+        harmony.Patch(
+            AccessTools.Method(typeof(MerchantInventory), nameof(MerchantInventory.CreateForNormalMerchant)),
+            postfix: new HarmonyMethod(typeof(FixtureActions), nameof(ReplaceShopRelic)));
+    }
 
     private static void ReplaceShopRelic(MerchantInventory __result)
     {
