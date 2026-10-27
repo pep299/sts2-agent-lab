@@ -139,10 +139,11 @@ class FixedCases(unittest.TestCase):
             output.mkdir(parents=True)
             checks.write(output / 'case.json', record)
             return record
-        with tempfile.TemporaryDirectory(dir=checks.REPO / 'local') as directory:
+        with tempfile.TemporaryDirectory() as directory:
             args = SimpleNamespace(catalog=Path(__file__).with_name('catalog.json'), events=['StoneOfAllTime'],
-                output=Path(directory) / 'out', backend='learn', max_paths=64, case_spec=spec)
-            with patch.object(checks, 'one_case', completed), patch('builtins.print'):
+                output=Path(directory) / 'local/out', backend='learn', max_paths=64, case_spec=spec)
+            with patch.object(checks, 'REPO', Path(directory).resolve()), \
+                    patch.object(checks, 'one_case', completed), patch('builtins.print'):
                 summary = checks.run(args)
             saved = json.loads((args.output / 'summary.json').read_text())
         self.assertEqual(summary['cases'][0]['status'], 'completed')
