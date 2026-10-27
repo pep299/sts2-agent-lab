@@ -1,0 +1,236 @@
+{
+  "defaults": {"seed": "EVENTCOVER111", "hp": 40, "max_hp": 80, "gold": 100},
+  "cases": [
+    {"name": "future-common-uncommon", "event": "TheFutureOfPotions", "fixture": "fixtures/potions-common-uncommon.json",
+     "expect": {
+       "present": [{"key": "THE_FUTURE_OF_POTIONS.pages.INITIAL.options.POTION", "option_index": 0}, {"key": "THE_FUTURE_OF_POTIONS.pages.INITIAL.options.POTION", "option_index": 1}],
+       "branches": [
+         {"selected": {"key": "THE_FUTURE_OF_POTIONS.pages.INITIAL.options.POTION", "option_index": 0}, "phases": ["rewards"], "terminal": null},
+         {"selected": {"key": "THE_FUTURE_OF_POTIONS.pages.INITIAL.options.POTION", "option_index": 1}, "phases": ["rewards"], "terminal": null}
+       ]
+     }},
+    {"name": "future-common-rare", "event": "TheFutureOfPotions", "fixture": "fixtures/potions-common-rare.json",
+     "expect": {
+       "present": [{"key": "THE_FUTURE_OF_POTIONS.pages.INITIAL.options.POTION", "option_index": 0}, {"key": "THE_FUTURE_OF_POTIONS.pages.INITIAL.options.POTION", "option_index": 1}],
+       "branches": [
+         {"selected": {"key": "THE_FUTURE_OF_POTIONS.pages.INITIAL.options.POTION", "option_index": 1}, "phases": ["rewards"], "terminal": null},
+         {"selected": {"key": "THE_FUTURE_OF_POTIONS.pages.INITIAL.options.POTION", "option_index": 0}, "phases": ["rewards"], "terminal": null}
+       ]
+     }},
+    {"name": "future-same-rarity", "event": "TheFutureOfPotions", "fixture": "fixtures/potions-same-rarity.json",
+     "expect": {
+       "present": [{"key": "THE_FUTURE_OF_POTIONS.pages.INITIAL.options.POTION", "option_index": 0}, {"key": "THE_FUTURE_OF_POTIONS.pages.INITIAL.options.POTION", "option_index": 1}],
+       "branches": [
+         {"selected": {"key": "THE_FUTURE_OF_POTIONS.pages.INITIAL.options.POTION", "option_index": 1}, "phases": ["rewards"], "terminal": null},
+         {"selected": {"key": "THE_FUTURE_OF_POTIONS.pages.INITIAL.options.POTION", "option_index": 0}, "phases": ["rewards"], "terminal": null}
+       ]
+     }},
+    {"name": "stone-potion", "event": "StoneOfAllTime", "fixture": "fixtures/stone-potion.json",
+     "expect": {
+       "present": [{"key": "STONE_OF_ALL_TIME.pages.INITIAL.options.LIFT"}, {"key": "STONE_OF_ALL_TIME.pages.INITIAL.options.PUSH"}],
+       "branches": [
+         {"selected": {"key": "STONE_OF_ALL_TIME.pages.INITIAL.options.LIFT"}, "phases": [], "terminal": null},
+         {"selected": {"key": "STONE_OF_ALL_TIME.pages.INITIAL.options.PUSH"}, "phases": ["grid_selection"], "terminal": null}
+       ]
+     }},
+    {"name": "stone-hp6", "event": "StoneOfAllTime", "fixture": "fixtures/stone-potion.json", "hp": 6,
+     "expect": {
+       "present": [{"key": "STONE_OF_ALL_TIME.pages.INITIAL.options.LIFT"}, {"key": "STONE_OF_ALL_TIME.pages.INITIAL.options.PUSH"}],
+       "branches": [
+         {"selected": {"key": "STONE_OF_ALL_TIME.pages.INITIAL.options.LIFT"}, "phases": [], "terminal": null},
+         {"selected": {"key": "STONE_OF_ALL_TIME.pages.INITIAL.options.PUSH"}, "phases": [], "terminal": "death"}
+       ]
+     }},
+    {"name": "stone-hp7", "event": "StoneOfAllTime", "fixture": "fixtures/stone-potion.json", "hp": 7,
+     "expect": {
+       "present": [{"key": "STONE_OF_ALL_TIME.pages.INITIAL.options.LIFT"}, {"key": "STONE_OF_ALL_TIME.pages.INITIAL.options.PUSH"}],
+       "branches": [
+         {"selected": {"key": "STONE_OF_ALL_TIME.pages.INITIAL.options.LIFT"}, "phases": [], "terminal": null},
+         {"selected": {"key": "STONE_OF_ALL_TIME.pages.INITIAL.options.PUSH"}, "phases": ["grid_selection"], "terminal": null}
+       ]
+     }},
+    {"name": "ranwid-trades", "event": "RanwidTheElder", "fixture": "fixtures/ranwid-trades.json",
+     "expect": {
+       "present": [{"key": "RANWID_THE_ELDER.pages.INITIAL.options.POTION"}, {"key": "RANWID_THE_ELDER.pages.INITIAL.options.GOLD"}, {"key": "RANWID_THE_ELDER.pages.INITIAL.options.RELIC"}],
+       "branches": [
+         {"selected": {"key": "RANWID_THE_ELDER.pages.INITIAL.options.RELIC"}, "phases": [], "terminal": null},
+         {"selected": {"key": "RANWID_THE_ELDER.pages.INITIAL.options.POTION"}, "phases": [], "terminal": null},
+         {"selected": {"key": "RANWID_THE_ELDER.pages.INITIAL.options.GOLD"}, "phases": [], "terminal": null}
+       ]
+     }},
+    {"name": "relic-trader", "event": "RelicTrader", "fixture": "fixtures/relic-trader.json",
+     "expect": {
+       "present": [{"key": "RELIC_TRADER.pages.INITIAL.options.TOP"}, {"key": "RELIC_TRADER.pages.INITIAL.options.MIDDLE"}, {"key": "RELIC_TRADER.pages.INITIAL.options.BOTTOM"}],
+       "branches": [
+         {"selected": {"key": "RELIC_TRADER.pages.INITIAL.options.MIDDLE"}, "phases": [], "terminal": null},
+         {"selected": {"key": "RELIC_TRADER.pages.INITIAL.options.TOP"}, "phases": [], "terminal": null},
+         {"selected": {"key": "RELIC_TRADER.pages.INITIAL.options.BOTTOM"}, "phases": [], "terminal": null}
+       ]
+     }},
+    {"name": "grave-exhaust", "event": "GraveOfTheForgotten", "fixture": "fixtures/grave-exhaust.json",
+     "expect": {
+       "present": [{"key": "GRAVE_OF_THE_FORGOTTEN.pages.INITIAL.options.CONFRONT"}, {"key": "GRAVE_OF_THE_FORGOTTEN.pages.INITIAL.options.ACCEPT"}],
+       "branches": [
+         {"selected": {"key": "GRAVE_OF_THE_FORGOTTEN.pages.INITIAL.options.ACCEPT"}, "phases": [], "terminal": null},
+         {"selected": {"key": "GRAVE_OF_THE_FORGOTTEN.pages.INITIAL.options.CONFRONT"}, "phases": [], "terminal": null}
+       ]
+     }},
+    {"name": "grave-exhaust-two", "event": "GraveOfTheForgotten", "fixture": "fixtures/grave-exhaust-two.json",
+     "expect": {
+       "present": [{"key": "GRAVE_OF_THE_FORGOTTEN.pages.INITIAL.options.CONFRONT"}, {"key": "GRAVE_OF_THE_FORGOTTEN.pages.INITIAL.options.ACCEPT"}],
+       "branches": [
+         {"selected": {"key": "GRAVE_OF_THE_FORGOTTEN.pages.INITIAL.options.ACCEPT"}, "phases": [], "terminal": null},
+         {"selected": {"key": "GRAVE_OF_THE_FORGOTTEN.pages.INITIAL.options.CONFRONT"}, "phases": ["grid_selection"], "terminal": null}
+       ]
+     }},
+    {"name": "grave-no-exhaust", "event": "GraveOfTheForgotten", "fixture": "fixtures/single-bash.json",
+     "expect": {
+       "present": [{"key": "GRAVE_OF_THE_FORGOTTEN.pages.INITIAL.options.ACCEPT"}],
+       "branches": [
+         {"selected": {"key": "GRAVE_OF_THE_FORGOTTEN.pages.INITIAL.options.ACCEPT"}, "phases": [], "terminal": null}
+       ],
+       "absent": [{"key": "GRAVE_OF_THE_FORGOTTEN.pages.INITIAL.options.CONFRONT"}]
+     }},
+    {"name": "self-help-power", "event": "SelfHelpBook", "fixture": "fixtures/self-help-power.json",
+     "expect": {
+       "present": [{"key": "SELF_HELP_BOOK.pages.INITIAL.options.READ_THE_BACK"}, {"key": "SELF_HELP_BOOK.pages.INITIAL.options.READ_PASSAGE"}, {"key": "SELF_HELP_BOOK.pages.INITIAL.options.READ_ENTIRE_BOOK"}],
+       "branches": [
+         {"selected": {"key": "SELF_HELP_BOOK.pages.INITIAL.options.READ_PASSAGE"}, "phases": ["grid_selection"], "terminal": null},
+         {"selected": {"key": "SELF_HELP_BOOK.pages.INITIAL.options.READ_THE_BACK"}, "phases": ["grid_selection"], "terminal": null},
+         {"selected": {"key": "SELF_HELP_BOOK.pages.INITIAL.options.READ_ENTIRE_BOOK"}, "phases": [], "terminal": null}
+       ]
+     }},
+    {"name": "self-help-two-powers", "event": "SelfHelpBook", "fixture": "fixtures/self-help-two-powers.json",
+     "expect": {
+       "present": [{"key": "SELF_HELP_BOOK.pages.INITIAL.options.READ_THE_BACK"}, {"key": "SELF_HELP_BOOK.pages.INITIAL.options.READ_PASSAGE"}, {"key": "SELF_HELP_BOOK.pages.INITIAL.options.READ_ENTIRE_BOOK"}],
+       "branches": [
+         {"selected": {"key": "SELF_HELP_BOOK.pages.INITIAL.options.READ_PASSAGE"}, "phases": ["grid_selection"], "terminal": null},
+         {"selected": {"key": "SELF_HELP_BOOK.pages.INITIAL.options.READ_THE_BACK"}, "phases": ["grid_selection"], "terminal": null},
+         {"selected": {"key": "SELF_HELP_BOOK.pages.INITIAL.options.READ_ENTIRE_BOOK"}, "phases": ["grid_selection"], "terminal": null}
+       ]
+     }},
+    {"name": "self-help-no-power", "event": "SelfHelpBook", "fixture": "fixtures/single-bash.json",
+     "expect": {
+       "present": [{"key": "SELF_HELP_BOOK.pages.INITIAL.options.READ_THE_BACK"}],
+       "branches": [
+         {"selected": {"key": "SELF_HELP_BOOK.pages.INITIAL.options.READ_THE_BACK"}, "phases": [], "terminal": null}
+       ],
+       "absent": [{"key": "SELF_HELP_BOOK.pages.INITIAL.options.READ_PASSAGE"}, {"key": "SELF_HELP_BOOK.pages.INITIAL.options.READ_ENTIRE_BOOK"}]
+     }},
+    {"name": "crystal-with-potions", "event": "CrystalSphere", "fixture": "fixtures/potions-common-uncommon.json",
+     "expect": {
+       "present": [{"key": "CRYSTAL_SPHERE.pages.INITIAL.options.UNCOVER_FUTURE"}, {"key": "CRYSTAL_SPHERE.pages.INITIAL.options.PAYMENT_PLAN"}],
+       "branches": [
+         {"selected": {"key": "CRYSTAL_SPHERE.pages.INITIAL.options.UNCOVER_FUTURE"}, "phases": ["crystal_sphere"], "terminal": null},
+         {"selected": {"key": "CRYSTAL_SPHERE.pages.INITIAL.options.PAYMENT_PLAN"}, "phases": ["crystal_sphere"], "terminal": null}
+       ]
+     }},
+    {"name": "architect-victory", "event": "TheArchitect", "fixture": "fixtures/act-three.json",
+     "expect": {
+       "present": [{"key": "THE_ARCHITECT.dialogue.0"}],
+       "branches": [
+         {"selected": {"key": "THE_ARCHITECT.dialogue.0"}, "phases": [], "terminal": "victory"},
+         {"selected": {"key": "PROCEED"}, "phases": [], "terminal": "victory"}
+       ]
+     }},
+    {"name": "waterlogged-scriptorium-price-boundary-tentacle_quill-below", "event": "WaterloggedScriptorium", "fixture": "fixtures/act-one.json", "gold": 54,
+     "expect": {
+       "absent": [{"key": "WATERLOGGED_SCRIPTORIUM.pages.INITIAL.options.TENTACLE_QUILL"}]
+     }},
+    {"name": "waterlogged-scriptorium-price-boundary-tentacle_quill-exact", "event": "WaterloggedScriptorium", "fixture": "fixtures/act-one.json", "gold": 55,
+     "expect": {
+       "present": [{"key": "WATERLOGGED_SCRIPTORIUM.pages.INITIAL.options.TENTACLE_QUILL"}],
+       "branches": [
+         {"selected": {"key": "WATERLOGGED_SCRIPTORIUM.pages.INITIAL.options.TENTACLE_QUILL"}, "phases": [], "terminal": null}
+       ]
+     }},
+    {"name": "waterlogged-scriptorium-price-boundary-prickly_sponge-below", "event": "WaterloggedScriptorium", "fixture": "fixtures/act-one.json", "gold": 98,
+     "expect": {
+       "absent": [{"key": "WATERLOGGED_SCRIPTORIUM.pages.INITIAL.options.PRICKLY_SPONGE"}]
+     }},
+    {"name": "waterlogged-scriptorium-price-boundary-prickly_sponge-exact", "event": "WaterloggedScriptorium", "fixture": "fixtures/act-one.json", "gold": 99,
+     "expect": {
+       "present": [{"key": "WATERLOGGED_SCRIPTORIUM.pages.INITIAL.options.PRICKLY_SPONGE"}],
+       "branches": [
+         {"selected": {"key": "WATERLOGGED_SCRIPTORIUM.pages.INITIAL.options.PRICKLY_SPONGE"}, "phases": [], "terminal": null}
+       ]
+     }},
+    {"name": "zen-weaver-price-boundary-emotional_awareness-below", "event": "ZenWeaver", "fixture": "fixtures/act-two.json", "gold": 124,
+     "expect": {
+       "absent": [{"key": "ZEN_WEAVER.pages.INITIAL.options.EMOTIONAL_AWARENESS"}]
+     }},
+    {"name": "zen-weaver-price-boundary-emotional_awareness-exact", "event": "ZenWeaver", "fixture": "fixtures/act-two.json", "gold": 125,
+     "expect": {
+       "present": [{"key": "ZEN_WEAVER.pages.INITIAL.options.EMOTIONAL_AWARENESS"}],
+       "branches": [
+         {"selected": {"key": "ZEN_WEAVER.pages.INITIAL.options.EMOTIONAL_AWARENESS"}, "phases": [], "terminal": null}
+       ]
+     }},
+    {"name": "zen-weaver-price-boundary-arachnid_acupuncture-below", "event": "ZenWeaver", "fixture": "fixtures/act-two.json", "gold": 249,
+     "expect": {
+       "absent": [{"key": "ZEN_WEAVER.pages.INITIAL.options.ARACHNID_ACUPUNCTURE"}]
+     }},
+    {"name": "zen-weaver-price-boundary-arachnid_acupuncture-exact", "event": "ZenWeaver", "fixture": "fixtures/act-two.json", "gold": 250,
+     "expect": {
+       "present": [{"key": "ZEN_WEAVER.pages.INITIAL.options.ARACHNID_ACUPUNCTURE"}],
+       "branches": [
+         {"selected": {"key": "ZEN_WEAVER.pages.INITIAL.options.ARACHNID_ACUPUNCTURE"}, "phases": [], "terminal": null}
+       ]
+     }},
+    {"name": "tea-master-price-boundary-bone_tea-below", "event": "TeaMaster", "fixture": "fixtures/act-one.json", "gold": 49,
+     "expect": {
+       "absent": [{"key": "TEA_MASTER.pages.INITIAL.options.BONE_TEA"}]
+     }},
+    {"name": "tea-master-price-boundary-bone_tea-exact", "event": "TeaMaster", "fixture": "fixtures/act-one.json", "gold": 50,
+     "expect": {
+       "present": [{"key": "TEA_MASTER.pages.INITIAL.options.BONE_TEA"}],
+       "branches": [
+         {"selected": {"key": "TEA_MASTER.pages.INITIAL.options.BONE_TEA"}, "phases": [], "terminal": null}
+       ]
+     }},
+    {"name": "tea-master-price-boundary-ember_tea-below", "event": "TeaMaster", "fixture": "fixtures/act-one.json", "gold": 149,
+     "expect": {
+       "absent": [{"key": "TEA_MASTER.pages.INITIAL.options.EMBER_TEA"}]
+     }},
+    {"name": "tea-master-price-boundary-ember_tea-exact", "event": "TeaMaster", "fixture": "fixtures/act-one.json", "gold": 150,
+     "expect": {
+       "present": [{"key": "TEA_MASTER.pages.INITIAL.options.EMBER_TEA"}],
+       "branches": [
+         {"selected": {"key": "TEA_MASTER.pages.INITIAL.options.EMBER_TEA"}, "phases": [], "terminal": null}
+       ]
+     }},
+    {"name": "welcome-to-wongos-price-boundary-bargain_bin-below", "event": "WelcomeToWongos", "fixture": "fixtures/act-two.json", "gold": 99,
+     "expect": {
+       "absent": [{"key": "WELCOME_TO_WONGOS.pages.INITIAL.options.BARGAIN_BIN"}]
+     }},
+    {"name": "welcome-to-wongos-price-boundary-bargain_bin-exact", "event": "WelcomeToWongos", "fixture": "fixtures/act-two.json", "gold": 100,
+     "expect": {
+       "present": [{"key": "WELCOME_TO_WONGOS.pages.INITIAL.options.BARGAIN_BIN"}],
+       "branches": [
+         {"selected": {"key": "WELCOME_TO_WONGOS.pages.INITIAL.options.BARGAIN_BIN"}, "phases": [], "terminal": null}
+       ]
+     }},
+    {"name": "welcome-to-wongos-price-boundary-featured_item-below", "event": "WelcomeToWongos", "fixture": "fixtures/act-two.json", "gold": 199,
+     "expect": {
+       "absent": [{"key": "WELCOME_TO_WONGOS.pages.INITIAL.options.FEATURED_ITEM"}]
+     }},
+    {"name": "welcome-to-wongos-price-boundary-featured_item-exact", "event": "WelcomeToWongos", "fixture": "fixtures/act-two.json", "gold": 200,
+     "expect": {
+       "present": [{"key": "WELCOME_TO_WONGOS.pages.INITIAL.options.FEATURED_ITEM"}],
+       "branches": [
+         {"selected": {"key": "WELCOME_TO_WONGOS.pages.INITIAL.options.FEATURED_ITEM"}, "phases": [], "terminal": null}
+       ]
+     }},
+    {"name": "welcome-to-wongos-price-boundary-mystery_box-below", "event": "WelcomeToWongos", "fixture": "fixtures/act-two.json", "gold": 299,
+     "expect": {
+       "absent": [{"key": "WELCOME_TO_WONGOS.pages.INITIAL.options.MYSTERY_BOX"}]
+     }},
+    {"name": "welcome-to-wongos-price-boundary-mystery_box-exact", "event": "WelcomeToWongos", "fixture": "fixtures/act-two.json", "gold": 300,
+     "expect": {
+       "present": [{"key": "WELCOME_TO_WONGOS.pages.INITIAL.options.MYSTERY_BOX"}],
+       "branches": [
+         {"selected": {"key": "WELCOME_TO_WONGOS.pages.INITIAL.options.MYSTERY_BOX"}, "phases": [], "terminal": null}
+       ]
+     }}
+  ]
+}

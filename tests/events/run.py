@@ -128,6 +128,96 @@ def event_id(event):
     return event['id'].split('.', 1)[-1]
 
 
+def fixed_case(name, path=Path(__file__).with_name('cases.json')):
+    manifest = json.loads(path.read_text())
+    names = [case['name'] for case in manifest['cases']]
+    if len(names) != len(set(names)):
+        raise ValueError('固定case名が重複')
+    if name not in names:
+        raise ValueError('未知の固定case: ' + name)
+    spec = dict(manifest['defaults']) | manifest['cases'][names.index(name)]
+    allowed = {'name', 'event', 'seed', 'hp', 'max_hp', 'gold', 'fixture', 'expect'}
+    if spec.keys() != allowed or any(type(spec[k]) is not int for k in ('hp', 'max_hp', 'gold')):
+        raise ValueError('固定caseのフィールドが不正')
+    if not isinstance(spec['seed'], str) or re.fullmatch(r'[A-Za-z0-9]{1,64}', spec['seed']) is None:
+        raise ValueError('固定caseのseedが不正')
+    if not 1 <= spec['hp'] <= spec['max_hp'] or spec['gold'] < 0:
+        raise ValueError('固定caseのHP/goldが不正')
+    fixture = (path.parent / spec['fixture']).resolve()
+    if not fixture.is_relative_to((path.parent / 'fixtures').resolve()):
+        raise ValueError('固定caseのfixtureはfixtures内に指定')
+    spec['fixture'] = json.loads(fixture.read_text())
+    if (not isinstance(spec['fixture'], dict)
+            or not spec['fixture'].keys() <= {'act', 'potions', 'add_cards', 'relics', 'deck'}
+            or type(spec['fixture'].get('act')) is not int or spec['fixture']['act'] not in (1, 2, 3)):
+        raise ValueError('固定caseのfixtureが不正')
+    expect = spec['expect']
+    if not isinstance(expect, dict) or not expect or not expect.keys() <= {'present', 'absent', 'branches'}:
+        raise ValueError('固定caseの期待が不正')
+    if any(not isinstance(value, list) for value in expect.values()) or not any(expect.values()):
+        raise ValueError('固定caseの期待を一つ以上指定')
+    selectors = expect.get('present', []) + expect.get('absent', [])
+    for branch in expect.get('branches', []):
+        if (not isinstance(branch, dict) or set(branch) != {'selected', 'phases', 'terminal'}
+                or not isinstance(branch['phases'], list)
+                or any(not isinstance(phase, str) or not phase for phase in branch['phases'])
+                or branch['terminal'] not in (None, 'death', 'victory')):
+            raise ValueError('固定caseの分岐期待が不正')
+        selectors.append(branch['selected'])
+    for selector in selectors:
+        if (not isinstance(selector, dict) or not selector.keys() <= {'key', 'option_index'}
+                or not isinstance(selector.get('key'), str) or not selector['key']
+                or 'option_index' in selector and (type(selector['option_index']) is not int or selector['option_index'] < 0)):
+            raise ValueError('固定caseの候補指定が不正')
+    return spec
+
+
+def check_expectations(spec, records):
+    def matches(candidate, selector):
+        return all(candidate.get(key) == value for key, value in selector.items())
+
+    missing = []
+    expected_condition = {key: spec[key] for key in ('seed', 'hp', 'max_hp', 'gold')}
+    expected_condition['maxHp'] = expected_condition.pop('max_hp')
+    expected_condition |= {'character': 'IRONCLAD', 'ascension': 0} | spec['fixture']
+    expected_before = {key: expected_condition[key] for key in ('hp', 'maxHp', 'gold', 'act')}
+    def correct_input(record):
+        return (record.get('initialCondition') == expected_condition
+                and record.get('event', {}).get('name') == spec['event']
+                and all(record.get('before', {}).get(key) == value for key, value in expected_before.items()))
+
+    completed = [record for record in records if record['status'] == 'completed' and correct_input(record)]
+    if any(record.get('initialCondition') != expected_condition for record in records):
+        missing.append({'initialCondition': '固定caseの初期条件と記録が不一致'})
+    if any(not correct_input(record) for record in records):
+        missing.append({'before': '固定caseのイベント/HP/gold/actと公開開始状態が不一致'})
+    initials = [record['trace'][0]['candidates'] for record in completed if record.get('trace')]
+    for kind in ('present', 'absent'):
+        for selector in spec['expect'].get(kind, []):
+            counts = [sum(matches(candidate, selector) for candidate in candidates) for candidates in initials]
+            if not counts or any(count != (1 if kind == 'present' else 0) for count in counts):
+                missing.append({kind: selector})
+    for branch in spec['expect'].get('branches', []):
+        found = False
+        for record in completed:
+            for position, step in enumerate(record['trace']):
+                candidates = [c for c in step['candidates'] if matches(c, branch['selected'])]
+                if len(candidates) != 1 or candidates[0]['action_id'] != step['response']['action_id']:
+                    continue
+                following = record['trace'][position + 1:]
+                next_event = next((i for i, child in enumerate(following) if child['candidates']), len(following))
+                phases = {child['phase'] for child in following[:next_event]}
+                found |= (set(branch['phases']) <= phases and record['after']['terminal'] == branch['terminal'])
+        if not found:
+            missing.append({'branch': branch})
+    return missing
+
+
+def succeeded(summary):
+    return (bool(summary['cases']) and all(row['status'] == 'completed' for row in summary['cases'])
+            and summary.get('regression', {}).get('passed', True))
+
+
 def one_case(args, event, prefix, output, schedule, executed):
     started = time.monotonic()
     env = None
@@ -280,6 +370,11 @@ def run(args):
             rows.append({'event': event['name'], 'status': 'limit', 'unexecutedPaths': len(queue)})
     summary = {'backend': args.backend, 'fixture': True, 'expertData': False, 'cases': rows,
                'allBranchesVerified': False, 'scope': 'declared initial condition; no proof of full conditional or semantic coverage'}
+    if getattr(args, 'case_spec', None) is not None:
+        records = [json.loads((output / row['case'] / 'case.json').read_text()) for row in rows if row.get('case')]
+        missing = check_expectations(args.case_spec, records)
+        summary['regression'] = {'name': args.case_spec['name'], 'missing': missing,
+                                 'passed': succeeded(summary) and not missing}
     write(output / 'summary.json', summary)
     return summary
 
@@ -287,8 +382,10 @@ def run(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--backend', choices=['learn', 'native'], required=True)
-    parser.add_argument('--catalog', type=Path, required=True)
-    parser.add_argument('--events', nargs='+')
+    parser.add_argument('--catalog', type=Path, default=Path(__file__).with_name('catalog.json'))
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument('--events', nargs='+')
+    selection.add_argument('--case', help='cases.jsonの固定条件・期待を再実行（1設定）')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--dotnet', type=Path)
     parser.add_argument('--fixture-host', type=Path, default=REPO / 'local/learn_dll/event-fixture/bin/Release/net9.0/EventFixture.dll')
@@ -296,26 +393,41 @@ def main():
     parser.add_argument('--policy-config', type=Path, default=default_config())
     parser.add_argument('--fixture', type=Path, help='追加のact/potions/add_cards/relics/deckを記載したJSON')
     parser.add_argument('--include-special', action='store_true')
-    parser.add_argument('--seed', default='EVENTCOVER111')
-    parser.add_argument('--hp', type=int, default=40)
-    parser.add_argument('--max-hp', type=int, default=80)
-    parser.add_argument('--gold', type=int, default=100)
+    parser.add_argument('--seed')
+    parser.add_argument('--hp', type=int)
+    parser.add_argument('--max-hp', type=int)
+    parser.add_argument('--gold', type=int)
     parser.add_argument('--max-paths', type=int, default=64)
     parser.add_argument('--max-steps', type=int, default=200)
     parser.add_argument('--seconds', type=int, default=120)
     args = parser.parse_args()
-    if args.fixture:
+    if args.case:
+        if any(value is not None for value in (args.fixture, args.seed, args.hp, args.max_hp, args.gold)):
+            parser.error('--caseの初期条件は固定。--fixture/seed/hp/max-hp/goldは併用不可')
+        try:
+            args.case_spec = fixed_case(args.case)
+        except (OSError, KeyError, TypeError, ValueError) as error:
+            parser.error(str(error))
+        args.events = [args.case_spec['event']]
+        for key in ('seed', 'hp', 'max_hp', 'gold', 'fixture'):
+            setattr(args, key, args.case_spec[key])
+        args.include_special = True
+    else:
+        for key, default in {'seed': 'EVENTCOVER111', 'hp': 40, 'max_hp': 80, 'gold': 100}.items():
+            if getattr(args, key) is None:
+                setattr(args, key, default)
+    if args.fixture and not args.case:
         args.fixture = json.loads(args.fixture.read_text())
         if not isinstance(args.fixture, dict) or not args.fixture.keys() <= {'act', 'potions', 'add_cards', 'relics', 'deck'}:
             parser.error('fixtureの追加フィールドが不正')
-    else:
+    elif not args.case:
         args.fixture = {}
     if args.backend == 'learn' and (args.dotnet is None or args.learn_host_dir is None):
         parser.error('learnには--dotnetと--learn-host-dirが必要')
     if min(args.max_paths, args.max_steps, args.seconds, args.hp, args.max_hp) < 1 or args.hp > args.max_hp or args.gold < 0:
         parser.error('実行上限は正数、1 <= hp <= max-hp、gold >= 0を指定')
     result = run(args)
-    raise SystemExit(0 if all(r['status'] == 'completed' for r in result['cases']) else 1)
+    raise SystemExit(0 if succeeded(result) else 1)
 
 
 if __name__ == '__main__':

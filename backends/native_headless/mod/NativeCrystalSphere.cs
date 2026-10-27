@@ -3,6 +3,7 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.AutoSlay.Handlers.Screens;
 using MegaCrit.Sts2.Core.AutoSlay.Helpers;
 using MegaCrit.Sts2.Core.Events.Custom.CrystalSphereEvent;
+using MegaCrit.Sts2.Core.Events.Custom.CrystalSphereEvent.CrystalSphereItems;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.Events;
 using MegaCrit.Sts2.Core.Nodes.Events.Custom.CrystalSphere;
@@ -65,12 +66,22 @@ internal static class NativeCrystalSphere
                     actions.Add(new LegalActionDto { ActionId = "crystal_sphere_tool:" + tool, ActionType = "crystal_sphere_tool",
                         Description = "Select " + tool + " divination", Metadata = new() { ["tool"] = tool } });
             if (available.Count == 0) throw new NotSupportedException("Crystal Sphere has divinations but no visible hidden cell");
-            var revealed = CrystalSphereProjection.Project(game);
+            var revealed = cells.Select(c => c.Entity).Where(cell => !cell.IsHidden)
+                .OrderBy(cell => cell.X).ThenBy(cell => cell.Y).Select(cell => new {
+                    col = cell.X, row = cell.Y, content = cell.Item switch {
+                        null => "empty",
+                        CrystalSphereGold => "gold",
+                        CrystalSpherePotion => "potion",
+                        CrystalSphereCardReward => "card_reward",
+                        CrystalSphereRelic => "relic",
+                        CrystalSphereCurse => "curse",
+                        _ => throw new NotSupportedException("Crystalの公開セルに未対応の内容がある")
+                    } }).ToArray();
             var context = new SpecialChoiceContext { Actions = actions, CrystalSphere = new {
                 width = game.GridSize.X, height = game.GridSize.Y, divinationsLeft = game.DivinationCount,
                 tool = game.CrystalSphereTool.ToString(),
                 hiddenCells = cells.Where(c => c.Entity.IsHidden).Select(c => new { col = c.Entity.X, row = c.Entity.Y }).ToArray(),
-                revealedCells = revealed.Select(cell => new { col = cell.Col, row = cell.Row, content = cell.Content }).ToArray() } };
+                revealedCells = revealed } };
             string chosen = await FullAppBridgeServer.WaitForCoordinatorActionAsync("crystal_sphere", false, false, context);
             string[] parts = chosen.Split(':');
             if (parts[0] == "crystal_sphere_tool")
