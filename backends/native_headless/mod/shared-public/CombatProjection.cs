@@ -11,7 +11,7 @@ namespace Sts2Recorder;
 public sealed class CombatProjection
 {
     private readonly CardProjection cards;
-    public CombatProjection(CardProjection cards){this.cards=cards;KnownDrawTop.EnsureApplied();}
+    public CombatProjection(CardProjection cards){this.cards=cards;}
     public object[] DrawKnownTop(Player player)=>KnownDrawTop.Read(player.PlayerCombatState!.DrawPile)
         .Select(card=>cards.Read(card)).ToArray();
     private sealed record Identity(long Value);

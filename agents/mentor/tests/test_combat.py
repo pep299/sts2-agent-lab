@@ -126,8 +126,9 @@ class CombatContract(unittest.TestCase):
                                {'type': 'Relative', 'amount': -2, 'isReduceOnly': False, 'expiration': 2},
                                {'type': 'Relative', 'amount': 1, 'isReduceOnly': False, 'expiration': 4}])
         card = make_wire(obs, self.registries)['deck']['hand'][0]
-        self.assertEqual([card[k] for k in ('base_cost', 'persistent_cost', 'played_cost', 'stable_cost', 'cost_override')],
+        self.assertEqual([*card['public_costs'].values(), card['cost_override']],
                          [2, 4, 1, 3, 0])
+        self.assertTrue({'base_cost', 'persistent_cost', 'played_cost', 'stable_cost'}.isdisjoint(card))
         del cost['afterPlay']
         with self.assertRaisesRegex(Unsupported, '揃っていない'):
             make_wire(obs, self.registries)

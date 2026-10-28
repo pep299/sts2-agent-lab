@@ -68,11 +68,10 @@ def wire_cards(items, registries):
                'upgraded': c['upgrade'] > 0,
                'cost_override': -1 if cost['costsX'] else cost['current'],
                'flags': [k.lower() for k in c['keywords'] if k in {'Retain', 'Sly', 'Ethereal', 'Innate', 'Unplayable'}]}
-        local_costs = {'local': 'base_cost', 'afterTurn': 'persistent_cost',
-                       'afterPlay': 'played_cost', 'afterTurnAndPlay': 'stable_cost'}
+        local_costs = ('local', 'afterTurn', 'afterPlay', 'afterTurnAndPlay')
         if not all(type(cost.get(k)) is int for k in local_costs):
             raise Unsupported('カードのローカル費用と失効後費用が揃っていない')
-        row.update({target: cost[source] for source, target in local_costs.items()})
+        row['public_costs'] = {key: cost[key] for key in local_costs}
         if type(cost.get('unmodified')) is not int or not isinstance(cost.get('modifiers'), list):
             raise Unsupported('カードの未修飾費用と補正列が揃っていない')
         modifiers = []

@@ -61,7 +61,7 @@ class Mentor:
                 state, _ = checked_snapshot(self.engine, current)
                 action = {'action': 'start_relic_choice', 'relic': relic}
                 apply_public_action(state, action)
-                align_public_boundary(self.engine, state, current, candidates,
+                align_public_boundary(self.engine, state, candidates,
                     selection['min'], selection['max'], context.get('canSkip'))
                 previous = current, action
                 history = []
@@ -73,12 +73,8 @@ class Mentor:
                 state, replay_info = resume_choice(self.engine, previous[0], previous[1], current, candidates, history,
                     minimum=selection['min'], maximum=selection['max'], can_skip=context.get('canSkip'))
             pending = state.pending_choice()
-            derived = [(c['id'], c['upgraded']) for c in pending['cards']]
             generative = self.engine.choice_kind_is_generative(pending['kind'])
-            arity_matches = (selection['min'], selection['max']) == (pending['min_select'], pending['max_select'])
-            curse_subset = pending['kind'] == 'monster_curse_select' and selection['min'] == 0 and selection['max'] == 1 and pending['min_select'] == pending['max_select'] == 1
-            if offered != derived or not (arity_matches or curse_subset):
-                raise Unsupported('子選択の候補・枚数が再生と一致しない')
+            constrained = selection['min'] < pending['min_select']
             sims = self.search['boss_sims' if is_boss(observation) else 'sims']
             indices, searches = search_indices(self.engine, state, selection['min'], selection['max'],
                                                len(offered), sims=sims, threads=self.search['threads'])
@@ -90,7 +86,7 @@ class Mentor:
                     'sims': sims, 'search_actions': searches, 'search_calls': len(searches),
                     'replay': replay_info,
                     'world_generated_options': generative, 'hidden_info': 'beliefdraw',
-                    'choice_constraint': 'choose_one_curse_even_when_selector_allows_empty' if curse_subset else None}
+                    'choice_constraint': 'choose_one_curse_even_when_selector_allows_empty' if constrained else None}
         elif observation['state']['phase'] == 'crystal_sphere':
             response, info = choose_crystal(dict(observation, actions=actions))
         elif len(actions) == 1 and actions[0]['id'] != 'choose_cards:':

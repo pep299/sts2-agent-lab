@@ -13,10 +13,6 @@ def public_card(card, state=None):
     result = {k: card[k] for k in PUBLIC_CARD_FIELDS if k in card}
     result['flags'] = sorted(card.get('flags') or [])
     costs = card.get('public_costs')
-    if costs is None and 'base_cost' in card:
-        costs = {target: card.get(source, card['base_cost']) for source, target in
-                 [('base_cost', 'local'), ('persistent_cost', 'afterTurn'),
-                  ('played_cost', 'afterPlay'), ('stable_cost', 'afterTurnAndPlay')]}
     if costs is not None:
         result['public_costs'] = costs
     if 'local_cost' in card:
@@ -38,6 +34,18 @@ def public_relic(relic, counter_visible=True):
     return result
 
 
+def check_public_cards(cards, rebuilt, state, source):
+    if len(cards) != len(rebuilt):
+        raise Unsupported(f'入力復元でカード枚数が変わった: {source}')
+    for index, (before, after) in enumerate(zip(cards, rebuilt)):
+        if 'local_cost' in before and 'local_cost' not in after:
+            raise Unsupported(f'入力復元で費用補正の構造が失われた: {source}[{index}]')
+        expected, observed = public_card(before, state), public_card(after)
+        for key, value in expected.items():
+            if value is not None and observed.get(key) != value:
+                raise Unsupported(f'入力復元でカード属性が変わった: {source}[{index}].{key}')
+
+
 def checked_snapshot(engine, wire):
     """入力にある公開意味がdecoder往復で失われないことを先に検査する。"""
     state = engine.state_from_dict(wire)
@@ -45,15 +53,7 @@ def checked_snapshot(engine, wire):
     for pile in ('hand', 'draw_pile', 'discard_pile', 'exhaust_pile', 'play_pile', 'master_deck'):
         cards = wire['deck'].get(pile, [])
         actual = rebuilt['deck'].get(pile, [])
-        if len(cards) != len(actual):
-            raise Unsupported(f'入力復元でカード枚数が変わった: {pile}')
-        for index, (before, after) in enumerate(zip(cards, actual)):
-            if 'local_cost' in before and 'local_cost' not in after:
-                raise Unsupported(f'入力復元で費用補正の構造が失われた: {pile}[{index}]')
-            expected, observed = public_card(before, state), public_card(after)
-            for key, value in expected.items():
-                if value is not None and observed.get(key) != value:
-                    raise Unsupported(f'入力復元でカード属性が変わった: {pile}[{index}].{key}')
+        check_public_cards(cards, actual, state, pile)
     if len(wire['encounter']) != len(rebuilt['encounter']):
         raise Unsupported('入力復元で敵の数が変わった')
     power_sets = [('player', wire['player']['powers'], rebuilt['player']['powers'])]
@@ -100,7 +100,7 @@ def public_pins(deck, state=None):
     return [public_card(cards[index], state) for index in pins]
 
 
-def align_choice(engine, state, current, offered_cards):
+def align_choice(engine, state, offered_cards):
     """公開候補の属性と実体の位置を照合し、画面と同じ候補順へ並べる。"""
     expected = [public_card(card, state) for card in offered_cards]
     choice = state.pending_choice()
@@ -134,10 +134,6 @@ def align_choice(engine, state, current, offered_cards):
     if ordered != choice['cards']:
         state.open_injected_choice(choice['kind'], ordered, choice['min_select'],
                                    choice['max_select'], choice['can_skip'], True)
-
-
-def card_key(card):
-    return json.dumps({k: v for k, v in card.items() if k != 'stable_idx'}, sort_keys=True)
 
 
 def observed_draws(previous, current):
@@ -269,7 +265,7 @@ def public_projection(wire, observed=None):
     return result
 
 
-def align_public_boundary(engine, state, current, cards, minimum=None, maximum=None, can_skip=None):
+def align_public_boundary(engine, state, cards, minimum=None, maximum=None, can_skip=None):
     pending = state.pending_choice()
     if pending is None:
         raise Unsupported('直前の行動を再生しても子選択が開かない')
@@ -283,17 +279,14 @@ def align_public_boundary(engine, state, current, cards, minimum=None, maximum=N
         raise Unsupported('子選択の公開skip可否が再生と一致しない')
     if cards is not None:
         if not cards or isinstance(cards[0], dict):
-            candidate_input = deepcopy(current)
-            hand = candidate_input['deck']['hand']
-            count = len(hand)
-            hand.extend(cards)
-            _, candidate_output = checked_snapshot(engine, candidate_input)
-            cards = candidate_output['deck']['hand'][count:]
+            normalized = state.normalize_public_cards(cards)
+            check_public_cards(cards, normalized, state, '選択候補')
+            cards = normalized
             if engine.choice_kind_is_generative(pending['kind']):
                 state.open_generated_choice(pending['kind'], cards, pending['min_select'],
                                             pending['max_select'], pending['can_skip'])
             else:
-                align_choice(engine, state, current, cards)
+                align_choice(engine, state, cards)
         else:
             actual = [(c['id'], c['upgraded']) for c in pending['cards']]
             if actual != list(map(tuple, cards)):
@@ -303,7 +296,6 @@ def align_public_boundary(engine, state, current, cards, minimum=None, maximum=N
 def resume_choice(engine, previous, action, current, offered=None, history=(), *,
                   minimum=None, maximum=None, can_skip=None):
     wire = deepcopy(previous)
-    first_current = history[0]['current'] if history else current
     first_offered = history[0]['cards'] if history else offered
     if first_offered and isinstance(first_offered[0], dict):
         first_offered = [(c['id'], c['upgraded']) for c in first_offered]
@@ -315,21 +307,6 @@ def resume_choice(engine, previous, action, current, offered=None, history=(), *
         if boss['kind'] == 'KNOWLEDGE_DEMON' and any(i['kind'] == 'Debuff' for i in boss['intents']):
             # 公開された呪い候補から、既に実行された敵の行動と段階を特定する。
             boss.update(move_state='CURSE_OF_KNOWLEDGE', curse_of_knowledge_counter=stage)
-    if action['action'] == 'play' and 'public_draws' not in first_current:
-        played = wire['deck']['hand'][action['card_index']]
-        if played['id'] == 'PREPARED':
-            kept = [c for i, c in enumerate(wire['deck']['hand']) if i != action['card_index']]
-            hand = first_current['deck']['hand']
-            if [card_key(c) for c in kept] != [card_key(c) for c in hand[:len(kept)]]:
-                raise Unsupported('Prepared後の既存手札が再生元と一致しない')
-            drawn = []
-            for visible in hand[len(kept):]:
-                match = next((i for i, c in enumerate(wire['deck']['draw_pile']) if card_key(c) == card_key(visible)), None)
-                if match is None:
-                    raise Unsupported('Preparedの公開済みドローを山札集合から再生できない')
-                drawn.append(wire['deck']['draw_pile'].pop(match))
-            # 既に見えたドロー結果だけを再生する。次の判断の探索ではbeliefdrawを使う。
-            wire['deck']['draw_pile'] = drawn + wire['deck']['draw_pile']
     boundaries = [dict(step) for step in history] + [
         {'current': current, 'cards': offered, 'minimum': minimum, 'maximum': maximum, 'can_skip': can_skip}]
     for boundary in boundaries:
@@ -356,7 +333,7 @@ def resume_choice(engine, previous, action, current, offered=None, history=(), *
                         if different:
                             failure = f'子選択の再生と公開状態が一致しない: {different[0]}'
                             continue
-                        align_public_boundary(engine, candidate, boundary['current'], boundary.get('cards'),
+                        align_public_boundary(engine, candidate, boundary.get('cards'),
                                               boundary.get('minimum'), boundary.get('maximum'), boundary.get('can_skip'))
                     except (Unsupported, ValueError) as exc:
                         failure = str(exc)

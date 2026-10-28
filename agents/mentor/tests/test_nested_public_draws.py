@@ -52,6 +52,9 @@ class State:
     def local_cost_signature(self, value):
         return deepcopy(value['local_cost'])
 
+    def normalize_public_cards(self, cards):
+        return deepcopy(cards)
+
     def condition_observed_draws(self, options):
         self.queue = [deepcopy(option) for option in options]
         self.targets = [self.wire['deck'][PILES[o['pile']]][o['index']] for o in options]
@@ -179,7 +182,7 @@ class PublicDrawHypotheses(unittest.TestCase):
         for low, high, skip, message in ((1, 2, False, '枚数'), (1, 1, True, 'skip可否')):
             with self.subTest(high=high, skip=skip):
                 with self.assertRaisesRegex(Unsupported, message):
-                    align_public_boundary(engine, state, source, [card()], low, high, skip)
+                    align_public_boundary(engine, state, [card()], low, high, skip)
         self.assertEqual(engine.generated, [])
 
     def test_same_name_different_attributes_are_tried_after_draw_hook_changes(self):
@@ -331,9 +334,9 @@ class PublicDrawHypotheses(unittest.TestCase):
         state = engine.state_from_dict(source)
         pending(state)
         with self.assertRaisesRegex(Unsupported, '属性が再生中'):
-            align_public_boundary(engine, state, source, [card(9)], 1, 1, False)
+            align_public_boundary(engine, state, [card(9)], 1, 1, False)
         with self.assertRaisesRegex(Unsupported, 'skip可否'):
-            align_public_boundary(engine, state, source, [card()], 1, 1, True)
+            align_public_boundary(engine, state, [card()], 1, 1, True)
 
     def test_revealed_random_subset_is_conditioned_only_within_its_actual_pile(self):
         engine = Engine()
@@ -342,16 +345,16 @@ class PublicDrawHypotheses(unittest.TestCase):
         options = [dict(id=c['id'], upgraded=False, pile='draw', index=i)
                    for i, c in enumerate(source['deck']['draw_pile'][:2])]
         state.open_injected_choice('add_from_random_draw_subset', options, 1, 1, False, True)
-        align_public_boundary(engine, state, source, [card(2), card(3)], 1, 1, False)
+        align_public_boundary(engine, state, [card(2), card(3)], 1, 1, False)
         self.assertEqual([c['index'] for c in state.pending_choice()['cards']], [1, 2])
         self.assertEqual(state.wire['deck'], source['deck'])
         with self.assertRaisesRegex(Unsupported, '属性が再生中'):
-            align_public_boundary(engine, state, source, [card(2), card(9)], 1, 1, False)
+            align_public_boundary(engine, state, [card(2), card(9)], 1, 1, False)
         with self.assertRaisesRegex(Unsupported, '候補の枚数'):
-            align_public_boundary(engine, state, source, [card(2)], 1, 1, False)
+            align_public_boundary(engine, state, [card(2)], 1, 1, False)
         state.open_injected_choice('add_from_draw_by_type', options, 1, 1, False, True)
         with self.assertRaisesRegex(Unsupported, '属性が再生中'):
-            align_public_boundary(engine, state, source, [card(2), card(3)], 1, 1, False)
+            align_public_boundary(engine, state, [card(2), card(3)], 1, 1, False)
 
 
 if __name__ == '__main__':
