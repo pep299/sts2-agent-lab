@@ -17,7 +17,8 @@ def public_card(card, state=None):
         result['public_costs'] = costs
     if 'local_cost' in card:
         model = card['local_cost']
-        result['local_cost'] = state.local_cost_signature(card) if 'modifiers' in model and state is not None else model
+        result['local_cost'] = (state.normalize_public_cards([card])[0]['local_cost']
+                                if 'modifiers' in model and state is not None else model)
     return result
 
 

@@ -3,7 +3,7 @@ extension = "local/mentor/sts2_rs.abi3.so"
 model = "external/spire-mentor/sts2-pycli/data/ppo/ppo_fullrun_ironclad_plr_it550_v0111vocab.onnx"
 
 [identity]
-build_git = "0b2ba82bd77d000b8cba0f5a25a3e66a09ee257e"
+build_git = "2ebf44ee099357243d58ed6b860b78d87b8a34e4"
 model_sha256 = "b8bb1c85a497598bfa3430ad14b9bf5ca2335c7f3cf4b81101527098ceaa76c8"
 
 [search]

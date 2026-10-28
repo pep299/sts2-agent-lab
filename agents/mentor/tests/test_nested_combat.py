@@ -124,6 +124,42 @@ class ReplayContract(unittest.TestCase):
                 self.assertEqual(self.engine.state_to_dict(state), before)
                 self.assertEqual(state.pending_choice(), pending)
 
+    def test_invalid_generated_replacement_preserves_cards_and_pending_choice(self):
+        state = self.engine.state_from_dict(wire())
+        state.open_generated_choice('add_generated_to_hand', [card('ANGER')], 1, 1, False)
+        before = self.engine.state_to_dict(state)
+        pending = state.pending_choice()
+        for cards, low, high in [([card('UNKNOWN_CARD')], 1, 1),
+                                  ([card('BASH')], 2, 1), ([card('BASH')], 0, 2)]:
+            with self.subTest(cards=cards, low=low, high=high):
+                with self.assertRaises(ValueError):
+                    state.open_generated_choice('add_generated_to_hand', cards, low, high, False)
+                self.assertEqual(self.engine.state_to_dict(state), before)
+                self.assertEqual(state.pending_choice(), pending)
+        state.resolve_public_choice([0])
+        self.assertEqual(self.engine.state_to_dict(state)['deck']['hand'][-1]['id'], 'ANGER')
+
+    def test_invalid_injected_replacement_preserves_parent_and_post_effect(self):
+        source = wire()
+        source['deck']['hand'] = [card('BRAND'), card('ANGER'), card('DEFEND_IRONCLAD')]
+        state = self.engine.state_from_dict(source)
+        state.apply({'action': 'play', 'card_index': 0})
+        before = self.engine.state_to_dict(state)
+        pending = state.pending_choice()
+        for options, low, high in [([dict(pending['cards'][0], id='UNKNOWN_CARD')], 1, 1),
+                                    (pending['cards'], 2, 1), (pending['cards'], 0, 3)]:
+            with self.subTest(low=low, high=high):
+                with self.assertRaises(ValueError):
+                    state.open_injected_choice(pending['kind'], options, low, high, False, True)
+                self.assertEqual(self.engine.state_to_dict(state), before)
+                self.assertEqual(state.pending_choice(), pending)
+        state.open_injected_choice(pending['kind'], pending['cards'], 1, 1, False, True)
+        state.resolve_public_choice([0])
+        after = self.engine.state_to_dict(state)
+        self.assertIn('ANGER', [c['id'] for c in after['deck']['exhaust_pile']])
+        self.assertEqual(next(p['amount'] for p in after['player']['powers'] if p['name'] == 'STRENGTH'), 1)
+        self.assertFalse(state.has_pending_play())
+
     def test_v111_granted_sly_is_distinct_from_older_intrinsic_sly(self):
         source = wire()
         source['deck']['hand'] = [card('HAZE', flags=['sly'])]

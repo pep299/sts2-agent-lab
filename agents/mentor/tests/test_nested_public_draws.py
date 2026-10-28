@@ -49,9 +49,6 @@ class State:
         result.captured = self.captured
         return result
 
-    def local_cost_signature(self, value):
-        return deepcopy(value['local_cost'])
-
     def normalize_public_cards(self, cards):
         return deepcopy(cards)
 
