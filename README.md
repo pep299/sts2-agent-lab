@@ -8,7 +8,7 @@ Slay the Spire 2のAIエージェント開発に向けた調査・実験。
 
 [learnの公開観測ホスト](backends/learn_dll/batch.py)にも同じ方策コマンドを接続できる。
 
-Mentorの推論拡張を手元で作る場合は`make mentor-deps mentor-patch mentor-build`、確認済み拡張があれば設定の`paths.extension`へ指定する。方策の設定例は`config/mentor.example.toml`。
+Mentorの推論拡張を手元で作る場合は`make mentor-deps mentor-build`、確認済み拡張があれば設定の`paths.extension`へ指定する。方策の設定例は`config/mentor.example.toml`。
 
 ```bash
 python3 -m agents.mentor --help

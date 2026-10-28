@@ -145,7 +145,7 @@ class ReplayContract(unittest.TestCase):
             align_public_boundary(self.engine, state, candidates)
         self.assertEqual(state.pending_choice(), pending)
 
-    def test_wish_override_survives_state_reconstruction_and_search(self):
+    def test_wish_choice_survives_state_reconstruction_and_search(self):
         source = wire()
         source['deck']['hand'] = [{'id': 'WISH', 'stable_idx': 0, 'kind': 'card', 'upgraded': False}]
         state = self.engine.state_from_dict(source)

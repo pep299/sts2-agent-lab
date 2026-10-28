@@ -11,6 +11,6 @@ nativeブリッジと共有投影は**独自保守**とし、上流HEADへの定
 
 `external/sts2-sim`は独立したsubmoduleで、そちらのライセンスに従う。ゲーム本体・資源・保存データはこのrepoのMIT許諾対象ではない。本プロジェクトはMega Critの公式製品・提携プロジェクトではない。
 
-`external/spire-mentor`は[Spire Mentor](https://github.com/tfriedel/spire-mentor)由来の固定commitを参照するsubmodule。ソース・配布学習済みネットワークのMIT許諾は同submoduleの`LICENSE`・`NOTICE`に従う。`agents/mentor`はそのRust推論API・モデルを利用する公開観測アダプター。`agents/mentor/engine`は上流のPython APIを組み込み、カード処理の登録APIでWishを差し替える。Wish実装は上流からの派生で同じMIT許諾に従う。戦闘状態・費用期限・選択の継続処理はsubmoduleのソースで修正する。`make mentor-patch`は上流をRustライブラリだけにして不要なPython拡張の生成を省く`library-only.patch`を適用する。更新時はcommit・patch・モデルSHA・回帰試験を揃えて変更する。
+`external/spire-mentor`は[Spire Mentor](https://github.com/tfriedel/spire-mentor)由来の[保守fork](https://github.com/pep299/spire-mentor)を固定commitで参照するsubmodule。ソース・配布学習済みネットワークのMIT許諾は同submoduleの`LICENSE`・`NOTICE`に従う。`agents/mentor`は標準Python拡張・モデルを利用する公開観測アダプター。更新時は固定commit・モデルSHA・回帰試験を揃えて変更する。
 
 `external/learn-the-spire`は[pep299/learn-the-spire](https://github.com/pep299/learn-the-spire)のv0.111対応と公開観測アドオンを固定commitで参照する。元実装のUnlicenseと、取り込まれた第三者コードの許諾は同submoduleの`LICENSE`・`NOTICE.md`を参照する。ゲームDLLは含めず、所有する入力をビルド時に指定する。
