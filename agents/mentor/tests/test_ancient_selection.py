@@ -69,6 +69,60 @@ class AncientSelection(unittest.TestCase):
         self.assertEqual(info['source'], 'ppo_copy_via_grant_proxy')
         self.assertEqual(info['purpose'], 'copy')
 
+    def test_modifiers_reach_model_without_collapsing_same_name_cards(self):
+        fields = {'remove': 'card_removal_option_enchantments',
+                  'upgrade': 'smith_option_enchantments', 'copy': 'card_grant_option_enchantments',
+                  'grant': 'card_grant_option_enchantments',
+                  'transform': 'transform_select_deck_indices', 'enchant': 'enchant_select_deck_indices'}
+        for purpose, field in fields.items():
+            with self.subTest(purpose=purpose):
+                plain, enchanted = card('BASH'), card('BASH')
+                enchanted['state']['enchantment'] = {'id': 'ENCHANTMENT.SHARP', 'amount': 3}
+                obs = self.selection(purpose, 1, 1)
+                obs['state']['status']['deckCards'] = [plain, enchanted]
+                obs['state']['selection'].update(cards=[enchanted, plain], enchantment='NIMBLE')
+                seen = []
+                def distribution(packet, actions, features):
+                    seen.append(packet)
+                    return self.runtime.net.distribution(packet, actions, features)
+                policy = self.policy()
+                policy.net = SimpleNamespace(distribution=distribution)
+                response, _ = policy.choose(obs)
+                self.assertEqual(len(response['indices']), 1)
+                self.assertEqual(seen[0]['deck_enchantments'], [None, ['SHARP', 3]])
+                expected = [1, 0] if purpose in {'transform', 'enchant'} else [['SHARP', 3], None]
+                self.assertEqual(seen[0][field], expected)
+
+    def test_optional_reward_preserves_upgrade_and_modifier_features(self):
+        obs = self.selection('grant', 0, 1)
+        obs['state']['selection']['cards'][0]['state']['enchantment'] = {'id': 'ENCHANTMENT.SHARP', 'amount': 3}
+        obs['state']['selection']['cards'][1]['state']['upgrade'] = 1
+        seen = []
+        def distribution(packet, actions, features):
+            seen.append(packet)
+            return self.runtime.net.distribution(packet, actions, features)
+        policy = self.policy()
+        policy.net = SimpleNamespace(distribution=distribution)
+        policy.choose(obs)
+        self.assertEqual(seen[0]['card_reward_option_upgraded'], [False, True, False])
+        self.assertEqual(seen[0]['card_reward_option_enchantments'], [['SHARP', 3], None, None])
+
+    def test_bundle_preserves_modifier_order_for_every_card(self):
+        plain, enchanted = card('BASH'), card('BASH')
+        enchanted['state']['enchantment'] = {'id': 'ENCHANTMENT.SHARP', 'amount': 3}
+        obs = observation('bundle_selection')
+        obs['state']['bundles'] = [[enchanted, plain], [plain, enchanted]]
+        obs['actions'] = [{'id': f'execute:{i}', 'kind': 'choose_bundle',
+                           'detail': {'metadata': {'bundle_index': i}}} for i in range(2)]
+        seen = []
+        def distribution(packet, actions, features):
+            seen.append(packet)
+            return self.runtime.net.distribution(packet, actions, features)
+        policy = self.policy()
+        policy.net = SimpleNamespace(distribution=distribution)
+        policy.choose(obs)
+        self.assertEqual(seen[0]['card_grant_option_enchantments'], [['SHARP', 3], None, None, ['SHARP', 3]])
+
     def test_optional_shop_enchants_keep_name_and_choose_legal_maximum(self):
         runtime = self.runtime
         for parent, enchantment in [('GNARLED_HAMMER', 'SHARP'), ('KIFUDA', 'ADROIT')]:

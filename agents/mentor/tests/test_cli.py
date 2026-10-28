@@ -32,8 +32,8 @@ class PolicyCliContract(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             config = tomllib.loads(CONFIG.read_text())
             contents = CONFIG.read_text()
-            for key, value in config['identity'].items():
-                contents = contents.replace(f'{key} = "{value}"', '')
+            for key in ('build_git', 'model_sha256'):
+                contents = contents.replace(f'{key} = "{config["identity"][key]}"', '')
             unpinned = Path(directory) / 'existing-artifacts.toml'
             unpinned.write_text(contents)
             result = subprocess.run([sys.executable, '-B', '-m', 'agents.mentor',
@@ -43,6 +43,7 @@ class PolicyCliContract(unittest.TestCase):
             info = json.loads(result.stderr)
             self.assertEqual(info['model_sha256'], config['identity']['model_sha256'])
             self.assertEqual(info['build_git'], config['identity']['build_git'])
+            self.assertEqual(info['features'], config['identity'].get('features', ''))
 
     def test_wrong_model_identity_fails_before_accepting_input(self):
         with tempfile.TemporaryDirectory() as directory:
