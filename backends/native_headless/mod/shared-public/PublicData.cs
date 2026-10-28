@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Reflection;
 using System.Text.Json;
+using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Models;
 namespace Sts2Recorder;
 
 // 公開状態の読み取りだけを許可し、乱数・抽選袋・AIの内部状態はたどらない。
@@ -39,23 +41,62 @@ public static class PublicData
             .Select(v=>(object)new{name=Required(v,"Name"),baseValue=Required(v,"BaseValue"),
                 enchantedValue=Required(v,"EnchantedValue"),previewValue=Required(v,"PreviewValue")}).ToArray();
     public static object[] DynamicVars(object model)=>DynamicVarValues(Property(model,"DynamicVars"));
+    public static object Power(object power)=>new{id=Id(power),amount=Required(power,"Amount"),
+        displayAmount=Required(power,"DisplayAmount"),title=Title(power),rules=Localization(Required(power,"Description")),
+        dynamicVars=DynamicVars(power),facing=power.GetType().Name=="SurroundedPower"?Required(power,"Facing").ToString():null,
+        applierCombatId=power.GetType().Name=="FlankingPower"?Property(Property(power,"Applier"),"CombatId"):null,
+        targetCombatId=power.GetType().Name=="SandpitPower"?Property(Property(power,"Target"),"CombatId"):null};
+    private static readonly FieldInfo? LocalModifiersField=typeof(CardEnergyCost).GetField("_localModifiers",Instance);
+    public static object EnergyCost(object value)
+    {
+        var cost=((CardModel)value).EnergyCost;
+        var modifiers=LocalModifiersField?.GetValue(cost) as IEnumerable<LocalCostModifier>;
+        if(cost.HasLocalModifiers&&modifiers==null)
+            throw new MissingFieldException(cost.GetType().Name,"_localModifiers");
+        var lifetimes=new[]{(LocalCostModifierExpiration)0,LocalCostModifierExpiration.EndOfTurn,
+            LocalCostModifierExpiration.WhenPlayed,LocalCostModifierExpiration.EndOfTurn|LocalCostModifierExpiration.WhenPlayed};
+        int basis=cost.GetWithModifiers(CostModifiers.None);
+        var amounts=Enumerable.Repeat(basis,4).ToArray();var effects=new List<object>();
+        foreach(var modifier in modifiers??Enumerable.Empty<LocalCostModifier>())
+        {
+            effects.Add(new{type=modifier.Type.ToString(),amount=modifier.Amount,isReduceOnly=modifier.IsReduceOnly,
+                expiration=(int)modifier.Expiration});
+            for(int i=0;i<lifetimes.Length;i++)
+                if((modifier.Expiration&lifetimes[i])==0)
+                    if(basis>=0&&!cost.CostsX)amounts[i]=modifier.Modify(amounts[i]);
+        }
+        for(int i=0;i<amounts.Length;i++)amounts[i]=cost.CostsX?-1:basis<0?basis:Math.Max(0,amounts[i]);
+        return new{canonical=cost.Canonical,costsX=cost.CostsX,current=cost.GetResolved(),unmodified=basis,modifiers=effects,
+            local=amounts[0],afterTurn=amounts[1],afterPlay=amounts[2],afterTurnAndPlay=amounts[3]};
+    }
     public static object Card(object card)
     {
-        var cost=Required(card,"EnergyCost");
         var preview=Call(Required(card,"DynamicVars"),"Clone",card)!;
         var mode=Enum.Parse(card.GetType().Assembly.GetType("MegaCrit.Sts2.Core.Entities.Cards.CardPreviewMode",true)!,"Normal");
         Call(card,"UpdateDynamicVarPreview",mode,null,preview);
         return new{title=Title(card),type=Required(card,"Type").ToString(),rarity=Required(card,"Rarity").ToString(),
             targetType=Required(card,"TargetType").ToString(),rules=Localization(Required(card,"Description")),
-            energyCost=new{canonical=Required(cost,"Canonical"),costsX=Required(cost,"CostsX"),current=Call(cost,"GetResolved")},
+            energyCost=EnergyCost(card),
             starCost=new{current=Required(card,"CurrentStarCost"),costsX=Required(card,"HasStarCostX")},
             dynamicVars=DynamicVarValues(preview),retain=Required(card,"ShouldRetainThisTurn"),sly=Required(card,"IsSlyThisTurn")};
     }
-    public static object Relic(object relic)=>new{id=Id(relic),title=Title(relic),
+    private static object? RelicEffectState(object relic,Func<object,object>? reference)
+    {
+        if(reference==null)return null;
+        object? Card(string name)=>Property(relic,name) is {} card?reference?.Invoke(card):null;
+        return Id(relic) switch {
+            "RELIC.PEN_NIB"=>new{attacksPlayed=Required(relic,"AttacksPlayed"),attackToDouble=Card("AttackToDouble")},
+            "RELIC.CENTENNIAL_PUZZLE"=>new{usedThisCombat=Required(relic,"UsedThisCombat")},
+            "RELIC.VAMBRACE"=>new{blockGainedThisCombat=Required(relic,"BlockGainedThisCombat"),triggeringCard=Card("TriggeringCard")},
+            _=>null};
+    }
+    public static object Relic(object relic)=>Relic(relic,null);
+    public static object Relic(object relic,Func<object,object>? reference)=>new{id=Id(relic),title=Title(relic),
         rules=Localization(Required(relic,"Description")),dynamicVars=DynamicVars(relic),
         showCounter=Required(relic,"ShowCounter"),
         counter=(bool)Required(relic,"ShowCounter")?Required(relic,"DisplayAmount"):null,
-        stackCount=Required(relic,"StackCount"),isMelted=Required(relic,"IsMelted"),isUsedUp=Required(relic,"IsUsedUp")};
+        stackCount=Required(relic,"StackCount"),isMelted=Required(relic,"IsMelted"),isUsedUp=Required(relic,"IsUsedUp"),
+        effectState=RelicEffectState(relic,reference)};
     public static object Potion(object potion)=>new{id=Id(potion),title=Title(potion),
         rules=Localization(Required(potion,"Description")),dynamicVars=DynamicVars(potion),
         targetType=Required(potion,"TargetType").ToString(),queued=Required(potion,"IsQueued")};

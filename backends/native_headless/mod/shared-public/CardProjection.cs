@@ -11,6 +11,8 @@ public sealed class CardProjection
     private sealed record Identity(long Value);
     private readonly ConditionalWeakTable<object,Identity> identities=new();
     private long nextIdentity;
+    public long Instance(object card)=>identities.GetValue(card,_=>new Identity(++nextIdentity)).Value;
+    public object Reference(object card)=>new{id=Required(card,"Id").ToString(),instance=Instance(card)};
     private static object? Get(object x,string name)=>
         (x.GetType().GetProperty(name,BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic)
          ??throw new MissingMemberException(x.GetType().Name,name)).GetValue(x);
@@ -28,7 +30,7 @@ public sealed class CardProjection
             fakeUpgradeLevel=Required(card,"FakeUpgradeLevel"),
             baseDamage=Required(Required(Required(card,"DynamicVars"),"Damage"),"BaseValue")}:null;
         var keywords=((IEnumerable)Required(card,"Keywords")).Cast<object>().Select(x=>x.ToString()).OrderBy(x=>x,StringComparer.Ordinal).ToArray();
-        return new {id,instance=assignIdentity?(long?)identities.GetValue(card,_=>new Identity(++nextIdentity)).Value:null,
+        return new {id,instance=assignIdentity?(long?)Instance(card):null,
             identityScope="recorder_process",upgrade=Required(card,"CurrentUpgradeLevel"),keywords,
             affliction=Modifier(Get(card,"Affliction"),false),enchantment=Modifier(Get(card,"Enchantment"),true),special,
             facts=PublicData.Card(card)};

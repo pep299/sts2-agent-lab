@@ -18,32 +18,20 @@ public sealed class CardSelectContext
     public int MinSelect { get; init; }
     public int MaxSelect { get; init; }
     public List<CardModel> Cards { get; init; } = new();
+    public CardSelectionContext? Context { get; init; }
 }
 
 public static class CardSelectBridge
 {
-    private static string _purpose = "";
-
     public static void Apply(Harmony harmony)
     {
-        MethodInfo setPurpose = AccessTools.Method(typeof(CardSelectBridge), nameof(SetPurpose));
-        foreach (MethodInfo method in typeof(CardSelectCmd).GetMethods(BindingFlags.Public | BindingFlags.Static))
-        {
-            if (!method.Name.StartsWith("From", StringComparison.Ordinal)) continue;
-            try { harmony.Patch(method, prefix: new HarmonyMethod(setPurpose)); }
-            catch (Exception ex) { Godot.GD.PrintErr($"[FullAppBridge] card select purpose {method.Name}: {ex.Message}"); }
-        }
+        SelectionCapture.Apply(harmony);
         try
         {
             MethodInfo? select = AccessTools.Method(typeof(AutoSlayCardSelector), nameof(AutoSlayCardSelector.GetSelectedCards));
             if (select != null) harmony.Patch(select, prefix: new HarmonyMethod(AccessTools.Method(typeof(CardSelectBridge), nameof(HandleGetSelectedCards))));
         }
         catch (Exception ex) { Godot.GD.PrintErr($"[FullAppBridge] card selector: {ex.Message}"); }
-    }
-
-    private static void SetPurpose(MethodBase __originalMethod)
-    {
-        _purpose = __originalMethod.Name;
     }
 
     private static bool HandleGetSelectedCards(IEnumerable<CardModel> options, int minSelect, int maxSelect, ref Task<IEnumerable<CardModel>> __result)
@@ -57,10 +45,10 @@ public static class CardSelectBridge
 
     private static async Task<IEnumerable<CardModel>> SelectAsync(List<CardModel> cards, int minSelect, int maxSelect)
     {
-        string purpose = _purpose;
-        _purpose = "";
+        var request = SelectionCapture.Current;
         if (cards.Count == 0) return Array.Empty<CardModel>();
-        var context = new CardSelectContext { Purpose = purpose, MinSelect = minSelect, MaxSelect = maxSelect, Cards = cards };
+        if(request?.CanSkip==false&&maxSelect>0)minSelect=Math.Max(1,minSelect);
+        var context = new CardSelectContext { Purpose = request?.Api??"", MinSelect = minSelect, MaxSelect = maxSelect, Cards = cards, Context=request };
         string actionId;
         Interlocked.Increment(ref Pending);
         try

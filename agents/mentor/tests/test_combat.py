@@ -4,19 +4,25 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-from agents.mentor.combat import Unsupported, is_boss, make_wire, match_action
+from agents.mentor.combat import Unsupported, is_boss, make_wire, match_action, wire_cards
 
 
 def observation():
     def card(name, instance):
         return {'state': {'id': 'CARD.' + name, 'instance': instance, 'upgrade': 0,
                          'keywords': [], 'facts': {'type': 'Skill', 'energyCost': {
-                             'canonical': 1, 'current': 1, 'costsX': False}, 'dynamicVars': []}}}
+                             'canonical': 1, 'current': 1, 'costsX': False,
+                             'local': 1, 'afterTurn': 1, 'afterPlay': 1, 'afterTurnAndPlay': 1,
+                             'unmodified': 1, 'modifiers': []},
+                         'dynamicVars': []}}}
     return {'state': {'status': {
         'hp': 70, 'maxHp': 80, 'block': 0, 'energy': 3, 'maxEnergy': 3, 'gold': 99,
         'powers': [], 'relicDetails': [], 'potionBelt': {'slots': []}, 'deckCards': [],
         'map': None, 'ascension': 0,
-        'combat': {'turn': 1, 'maxEnergy': 3, 'stars': 0, 'pets': [], 'orbs': [],
+        'combat': {'turn': 1, 'round': 1, 'side': 'Player', 'ownerId': 1,
+                   'history': {'coverage': 'current_turn', 'playsStarted': [], 'playsFinished': [],
+                               'blockGained': [], 'draws': []}, 'boundCardPlayedThisTurn': False,
+                   'maxEnergy': 3, 'stars': 0, 'pets': [], 'orbs': [],
                    'hand': {'cards': [card('A', 30)]},
                    'draw': {'cards': [card('B', 31), card('A', 32)]},
                    'discard': {'cards': []}, 'exhaust': {'cards': []},
@@ -24,6 +30,7 @@ def observation():
                                 'block': 0, 'powers': [], 'intents': []},
                                {'id': 42, 'modelId': 'MONSTER.X', 'hp': 20, 'maxHp': 20,
                                 'block': 0, 'powers': [], 'intents': []}]}}},
+        'capabilities': {'gameVersion': 'v0.111.0', 'observationRevision': 'public-state-v4'},
         'actions': [{'id': 'play-other-enemy', 'kind': 'play', 'detail': {
             'metadata': {'card_index': 0, 'target_id': 42}}}]}
 
@@ -107,13 +114,98 @@ class CombatContract(unittest.TestCase):
         state = obs['state']['status']['combat']['hand']['cards'][0]['state']
         state['enchantment'] = {'id': 'ENCHANTMENT.INSTINCT', 'amount': 1}
         state['facts']['energyCost']['current'] = 0
+        state['facts']['energyCost'].update(local=1, afterTurn=1, afterPlay=1, afterTurnAndPlay=1)
         card = make_wire(obs, self.registries | {'enchantment': {'INSTINCT'}})['deck']['hand'][0]
         self.assertEqual((card['enchantment'], card['enchantment_amount'], card['cost_override']), ('INSTINCT', 1, 0))
+
+    def test_cost_lifetimes_are_local_and_do_not_bake_in_global_discount(self):
+        obs = observation()
+        cost = obs['state']['status']['combat']['hand']['cards'][0]['state']['facts']['energyCost']
+        cost.update(canonical=4, unmodified=4, current=0, local=2, afterTurn=4, afterPlay=1, afterTurnAndPlay=3,
+                    modifiers=[{'type': 'Relative', 'amount': -1, 'isReduceOnly': False, 'expiration': 0},
+                               {'type': 'Relative', 'amount': -2, 'isReduceOnly': False, 'expiration': 2},
+                               {'type': 'Relative', 'amount': 1, 'isReduceOnly': False, 'expiration': 4}])
+        card = make_wire(obs, self.registries)['deck']['hand'][0]
+        self.assertEqual([card[k] for k in ('base_cost', 'persistent_cost', 'played_cost', 'stable_cost', 'cost_override')],
+                         [2, 4, 1, 3, 0])
+        del cost['afterPlay']
+        with self.assertRaisesRegex(Unsupported, '揃っていない'):
+            make_wire(obs, self.registries)
+
+    def test_legacy_discount_without_lifetime_is_rejected(self):
+        obs = observation()
+        obs['state']['status']['combat']['hand']['cards'][0]['state']['facts']['energyCost'] = {
+            'canonical': 1, 'current': 0, 'costsX': False}
+        with self.assertRaisesRegex(Unsupported, '失効後費用'):
+            make_wire(obs, self.registries)
+
+    def test_wither_validation_is_shared_by_snapshot_and_selection_candidates(self):
+        obs = observation()
+        c = obs['state']['status']['combat']['hand']['cards'][0]['state']
+        c.update(id='CARD.WITHER', special={'fakeUpgradeLevel': 2, 'baseDamage': 9})
+        c['facts']['dynamicVars'] = [{'name': 'Damage', 'baseValue': 9}]
+        regs = self.registries | {'card': {'A', 'B', 'WITHER'}}
+        before = copy.deepcopy(obs)
+        normal = make_wire(obs, regs)['deck']['hand']
+        candidates = wire_cards([{'cardDetails': {'state': c}}], regs)
+        self.assertEqual(normal, candidates)
+        self.assertEqual(normal[0]['base_damage'], 9)
+        self.assertEqual(obs, before)
+        for level in (-1, True, 1.5):
+            c['special']['fakeUpgradeLevel'] = level
+            with self.assertRaisesRegex(Unsupported, '特殊値'):
+                wire_cards([{'state': c}], regs)
+        c['special']['fakeUpgradeLevel'] = 2
+        c['facts']['dynamicVars'][0]['baseValue'] = 6
+        with self.assertRaisesRegex(Unsupported, '特殊値'):
+            wire_cards([{'state': c}], regs)
+
+    def test_temporary_retain_and_sly_are_not_permanent_keywords(self):
+        obs = observation()
+        c = obs['state']['status']['combat']['hand']['cards'][0]['state']
+        c['facts'].update(retain=True, sly=True)
+        self.assertEqual(make_wire(obs, self.registries)['deck']['hand'][0]['flags'], ['retain_turn', 'sly_turn'])
+        c['keywords'] = ['Retain', 'Sly']
+        self.assertEqual(make_wire(obs, self.registries)['deck']['hand'][0]['flags'], ['retain', 'sly'])
+
+    def test_pickup_relics_are_omitted_only_from_combat_and_melting_is_preserved(self):
+        obs = observation()
+        obs['state']['status']['relicDetails'] = [
+            {'id': 'RELIC.DOWSING_ROD', 'counter': None},
+            {'id': 'RELIC.NEOWS_SACRIFICE', 'counter': None},
+            {'id': 'RELIC.VAJRA', 'counter': 0, 'isMelted': True}]
+        before = copy.deepcopy(obs)
+        relics = make_wire(obs, self.registries | {'relic': {'VAJRA'}})['player']['relics']
+        self.assertEqual(relics, [{'id': 'VAJRA', 'counter': 0, 'is_melted': True}])
+        self.assertEqual(obs, before)
+        obs['state']['status']['relicDetails'].append({'id': 'RELIC.UNKNOWN', 'counter': None})
+        with self.assertRaises(Unsupported):
+            make_wire(obs, self.registries | {'relic': {'VAJRA'}})
+
+    def test_power_amount_display_and_public_effect_state_are_distinct(self):
+        obs = observation()
+        obs['state']['status']['powers'] = [
+            {'id': 'POWER.PANACHE', 'amount': 10, 'displayAmount': 2},
+            {'id': 'POWER.SURROUNDED', 'amount': 1, 'displayAmount': 1, 'facing': 'Left'},
+            {'id': 'POWER.CRIMSON_MANTLE', 'amount': 8, 'displayAmount': 8,
+             'dynamicVars': [{'name': 'SelfDamage', 'baseValue': 3}]}]
+        powers = make_wire(obs, self.registries | {'power': {'PANACHE', 'SURROUNDED', 'CRIMSON_MANTLE'}})['player']['powers']
+        self.assertEqual(powers, [{'name': 'PANACHE', 'amount': 10, 'display': 2},
+                                 {'name': 'SURROUNDED', 'amount': 1, 'display': 1, 'counter': 1},
+                                 {'name': 'CRIMSON_MANTLE', 'amount': 8, 'display': 8, 'counter': 3}])
+
+    def test_legacy_progress_amount_is_not_reinterpreted_as_stack(self):
+        obs = observation()
+        obs['state']['status']['powers'] = [{'id': 'POWER.PANACHE', 'amount': 2}]
+        obs['capabilities']['observationRevision'] = 'public-state-v3'
+        with self.assertRaisesRegex(Unsupported, 'public-state-v4'):
+            make_wire(obs, self.registries | {'power': {'PANACHE'}})
 
     def test_parent_card_in_play_is_preserved(self):
         obs = observation()
         combat = obs['state']['status']['combat']
         combat['play'] = {'cards': combat['hand']['cards']}
+        combat['hand'] = {'cards': []}
         self.assertEqual(make_wire(obs, self.registries)['deck']['play_pile'][0]['id'], 'A')
 
     def test_orb_order_values_and_capacity_are_preserved(self):

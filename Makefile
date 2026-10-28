@@ -39,7 +39,6 @@ mentor-deps:
 	git submodule update --init --recursive $(MENTOR_SOURCE)
 
 mentor-patch:
-	git -C $(MENTOR_SOURCE) apply --reverse --check "$(CURDIR)/patches/spire-mentor/autoplay-resume.patch" 2>/dev/null || git -C $(MENTOR_SOURCE) apply "$(CURDIR)/patches/spire-mentor/autoplay-resume.patch"
 	git -C $(MENTOR_SOURCE) apply --reverse --check "$(CURDIR)/patches/spire-mentor/library-only.patch" 2>/dev/null || git -C $(MENTOR_SOURCE) apply "$(CURDIR)/patches/spire-mentor/library-only.patch"
 
 mentor-build:

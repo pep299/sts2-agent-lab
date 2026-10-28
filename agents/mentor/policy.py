@@ -4,12 +4,12 @@ import json
 import sys
 import time
 
-from agents.mentor.combat import make_wire, match_action, resolve, wire_cards
+from agents.mentor.combat import make_wire, match_action, wire_cards
 from agents.mentor.crystal import choose as choose_crystal
-from agents.mentor.nested_combat import align_choice, resume_choice, search_indices
+from agents.mentor.nested_combat import align_public_boundary, apply_public_action, checked_snapshot, resume_choice, search_indices
 from agents.mentor.noncombat import NoncombatPolicy, UnscoredSelection, card, strategic_actions
 from agents.mentor.runtime import MentorRuntime
-from sts2.observation import Unsupported, card_state, is_boss
+from sts2.observation import Unsupported, is_boss
 from sts2.selection import SelectionContext
 
 
@@ -45,30 +45,36 @@ class Mentor:
         self.previous_combat = None
         actions = strategic_actions(observation)
         if observation['state']['phase'] == 'grid_selection' and observation['state']['status']['combat'] is not None:
-            if previous is None:
-                raise Unsupported('戦闘子選択に対応する直前の公開行動がない')
             current = make_wire(observation, self.registries, self.engine)
             selection = observation['state']['selection']
-            offered = [(resolve(card(c)['id'], self.registries['card'], ('_CARD', '_STATUS')),
-                        bool(card(c)['upgrade_level'])) for c in selection['cards']]
+            candidates = wire_cards(selection['cards'], self.registries)
+            offered = [(c['id'], c['upgraded']) for c in candidates]
             selection = dict(selection, max=min(selection['max'], len(offered)))
-            history = previous[2] if len(previous) > 2 else []
-            state, replay_info = resume_choice(self.engine, previous[0], previous[1], current, offered, history)
+            context = selection.get('context') or {}
+            source = context.get('source') or {}
+            if source.get('kind') == 'relic':
+                relic = source['modelId'].split('.', 1)[-1]
+                expected_hook = {'TOOLBOX': 'BeforeHandDraw', 'TOASTY_MITTENS': 'AfterPlayerTurnStart',
+                                 'GAMBLING_CHIP': 'AfterPlayerTurnStart', 'CHOICES_PARADOX': 'AfterPlayerTurnStart'}
+                if relic not in expected_hook or source.get('hook') != expected_hook[relic]:
+                    raise Unsupported('開始選択元のレリックとhookが対応しない')
+                state, _ = checked_snapshot(self.engine, current)
+                action = {'action': 'start_relic_choice', 'relic': relic}
+                apply_public_action(state, action)
+                align_public_boundary(self.engine, state, current, candidates,
+                    selection['min'], selection['max'], context.get('canSkip'))
+                previous = current, action
+                history = []
+                replay_info = {'method': 'public_relic_start_choice', 'relic': relic, 'hook': source['hook']}
+            else:
+                if previous is None:
+                    raise Unsupported('戦闘子選択に対応する直前の公開行動がない')
+                history = previous[2] if len(previous) > 2 else []
+                state, replay_info = resume_choice(self.engine, previous[0], previous[1], current, candidates, history,
+                    minimum=selection['min'], maximum=selection['max'], can_skip=context.get('canSkip'))
             pending = state.pending_choice()
             derived = [(c['id'], c['upgraded']) for c in pending['cards']]
             generative = self.engine.choice_kind_is_generative(pending['kind'])
-            if generative:
-                if any(card_state(c).get(k) for c in selection['cards'] for k in ('enchantment', 'affliction', 'special')):
-                    raise Unsupported('生成候補に付与・特殊値があり、選択候補への注入が未対応')
-                minimum = selection['min'] if pending['can_skip'] else pending['min_select']
-                state.open_injected_choice(pending['kind'], [{'id': name, 'upgraded': upgraded} for name, upgraded in offered],
-                    minimum, selection['max'], pending['can_skip'], True)
-                pending = state.pending_choice()
-                derived = [(c['id'], c['upgraded']) for c in pending['cards']]
-            else:
-                align_choice(self.engine, state, current, wire_cards(selection['cards'], self.registries))
-                pending = state.pending_choice()
-                derived = [(c['id'], c['upgraded']) for c in pending['cards']]
             arity_matches = (selection['min'], selection['max']) == (pending['min_select'], pending['max_select'])
             curse_subset = pending['kind'] == 'monster_curse_select' and selection['min'] == 0 and selection['max'] == 1 and pending['min_select'] == pending['max_select'] == 1
             if offered != derived or not (arity_matches or curse_subset):
@@ -77,7 +83,8 @@ class Mentor:
             indices, searches = search_indices(self.engine, state, selection['min'], selection['max'],
                                                len(offered), sims=sims, threads=self.search['threads'])
             self.previous_combat = previous[0], previous[1], history + [
-                {'current': current, 'cards': wire_cards(selection['cards'], self.registries), 'indices': indices}]
+                {'current': current, 'cards': candidates, 'indices': indices,
+                 'minimum': selection['min'], 'maximum': selection['max'], 'can_skip': pending['can_skip']}]
             response, info = {'action_id': 'choose_cards:', 'indices': indices}, {
                     'source': 'mcts_verified_replay_choice', 'kind': pending['kind'],
                     'sims': sims, 'search_actions': searches, 'search_calls': len(searches),
@@ -90,7 +97,7 @@ class Mentor:
             response, info = {'action_id': actions[0]['id']}, {'source': 'single_candidate'}
         elif observation['state']['phase'] == 'combat':
             wire = make_wire(observation, self.registries, self.engine)
-            state = self.engine.state_from_dict(wire)
+            state, _ = checked_snapshot(self.engine, wire)
             boss = is_boss(observation)
             result = self.engine.mcts_recommend(state, sims=self.search['boss_sims' if boss else 'sims'],
                         threads=self.search['threads'], hidden_info='beliefdraw', seed=0)

@@ -275,12 +275,13 @@ class ReplayContract(unittest.TestCase):
         self.assertEqual((exported['enchantment'], exported['enchantment_amount'], exported['cost_override']),
                          ('Instinct', 1, 0))
 
-    def test_public_comparison_does_not_claim_unobserved_internal_counters(self):
+    def test_public_comparison_checks_history_without_comparing_unobservable_storage(self):
         before, current = self.prepared_outcome()
         expected = public_projection(current)
-        current['player']['cards_played_this_turn'] = [1, 0, 0, 0, 0]
         current['deck']['hand'][0]['combat_vars'] = {'free_until_played': 0}
         self.assertEqual(public_projection(current), expected)
+        current['player']['cards_played_this_turn'] = [1, 0, 0, 0, 0]
+        self.assertNotEqual(public_projection(current), expected)
         current['player']['hp'] -= 1
         self.assertNotEqual(public_projection(current), expected)
 

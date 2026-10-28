@@ -1401,6 +1401,7 @@ name = "sts2-mentor-engine"
 version = "0.1.0"
 dependencies = [
  "pyo3",
+ "pyo3-build-config",
  "sts2-content",
  "sts2-core",
  "sts2-py",
