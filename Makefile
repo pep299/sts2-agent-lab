@@ -33,18 +33,14 @@ MENTOR_SOURCE := external/spire-mentor
 MENTOR_TARGET := $(CURDIR)/local/mentor/target
 MENTOR_LIB_EXT := $(if $(filter Darwin,$(shell uname -s)),dylib,so)
 
-.PHONY: mentor-deps mentor-patch mentor-build mentor-test sts2-test
+.PHONY: mentor-deps mentor-build mentor-test sts2-test
 
 mentor-deps:
 	git submodule update --init --recursive $(MENTOR_SOURCE)
 
-mentor-patch:
-	git -C $(MENTOR_SOURCE) apply --reverse --check "$(CURDIR)/patches/spire-mentor/autoplay-resume.patch" 2>/dev/null || git -C $(MENTOR_SOURCE) apply "$(CURDIR)/patches/spire-mentor/autoplay-resume.patch"
-	git -C $(MENTOR_SOURCE) apply --reverse --check "$(CURDIR)/patches/spire-mentor/library-only.patch" 2>/dev/null || git -C $(MENTOR_SOURCE) apply "$(CURDIR)/patches/spire-mentor/library-only.patch"
-
 mentor-build:
-	cd $(MENTOR_SOURCE)/sts2-rs && CARGO_TARGET_DIR="$(MENTOR_TARGET)" PYO3_PYTHON="$(PYTHON)" "$(MENTOR_CARGO)" build --manifest-path "$(CURDIR)/agents/mentor/engine/Cargo.toml" --locked --release $(MENTOR_CARGO_FLAGS)
-	cp "$(MENTOR_TARGET)/release/libmentor_rs.$(MENTOR_LIB_EXT)" local/mentor/mentor_rs.abi3.so
+	cd $(MENTOR_SOURCE)/sts2-rs && CARGO_TARGET_DIR="$(MENTOR_TARGET)" PYO3_PYTHON="$(PYTHON)" "$(MENTOR_CARGO)" build -p sts2-py --lib --features pyo3/extension-module --locked --release $(MENTOR_CARGO_FLAGS)
+	cp "$(MENTOR_TARGET)/release/libsts2_rs.$(MENTOR_LIB_EXT)" local/mentor/sts2_rs.abi3.so
 
 .PHONY: transport-test
 

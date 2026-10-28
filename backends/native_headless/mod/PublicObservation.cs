@@ -3,6 +3,7 @@ using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Merchant;
+using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Runs;
 using Sts2Recorder;
@@ -12,6 +13,7 @@ namespace Sts2.NativeSim.FullAppBridge;
 public static class PublicObservation
 {
     private static readonly CardProjection Cards = new();
+    private static readonly CombatProjection CombatState = new(Cards);
     private static readonly Dictionary<string, object> OfferHistory = new(StringComparer.Ordinal);
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private static object R(object x, string name) => PublicData.Required(x, name);
@@ -26,11 +28,7 @@ public static class PublicObservation
         if (unordered) cards = cards.OrderBy(Cards.SortKey, StringComparer.Ordinal).ToArray();
         return new { count = cards.Length, order = unordered ? "unordered" : "pile_display", cards = cards.Select(card => Card(card, !unordered)).ToArray() };
     }
-    private static object[] Powers(object creature) => Items(R(creature, "Powers")).Where(p => (bool)R(p, "IsVisible")).Select(p => (object)new {
-        id = PublicData.Id(p), amount = R(p, "DisplayAmount"), title = PublicData.Title(p), rules = PublicData.Localization(R(p, "Description")), dynamicVars = PublicData.DynamicVars(p),
-        facing = p.GetType().Name == "SurroundedPower" ? R(p, "Facing").ToString() : null,
-        applierCombatId = p.GetType().Name == "FlankingPower" ? P(P(p, "Applier"), "CombatId") : null,
-        targetCombatId = p.GetType().Name == "SandpitPower" ? P(P(p, "Target"), "CombatId") : null }).ToArray();
+    private static object[] Powers(object creature) => Items(R(creature, "Powers")).Where(p => (bool)R(p, "IsVisible")).Select(PublicData.Power).ToArray();
     private static bool IsType(object value, string name) { for (Type? t = value.GetType(); t != null; t = t.BaseType) if (t.Name == name) return true; return false; }
     private static object[] Enemies(object combat) => Items(R(combat, "Enemies")).Select(enemy => (object)new {
         id = R(enemy, "CombatId"), modelId = R(enemy, "ModelId").ToString(), name = R(enemy, "Name").ToString(),
@@ -44,7 +42,9 @@ public static class PublicObservation
     {
         if (CombatManager.Instance?.IsInProgress != true || P(player, "PlayerCombatState") is not object pc) return null;
         var combat = CombatManager.Instance.DebugOnlyGetState()!; var queue = R(pc, "OrbQueue");
-        return new { turn = R(pc, "TurnNumber"), phase = R(pc, "Phase").ToString(), maxEnergy = R(pc, "MaxEnergy"), stars = R(pc, "Stars"),
+        return new { ownerId = R(R(player,"Creature"),"CombatId"), round=combat.RoundNumber,side=combat.CurrentSide.ToString(),turn = R(pc, "TurnNumber"), phase = R(pc, "Phase").ToString(), maxEnergy = R(pc, "MaxEnergy"), stars = R(pc, "Stars"),
+            history=CombatState.Read(CombatManager.Instance.History,combat,(Player)player),boundCardPlayedThisTurn=CombatProjection.BoundUsed(((Player)player).Creature),
+            drawKnownTop=CombatState.DrawKnownTop((Player)player),
             hand = Pile(pc, "Hand"), draw = Pile(pc, "DrawPile", true), discard = Pile(pc, "DiscardPile"), exhaust = Pile(pc, "ExhaustPile"), play = Pile(pc, "PlayPile"),
             orbCapacity = R(queue, "Capacity"), orbs = Items(R(queue, "Orbs")).Select(o => new { id = PublicData.Id(o), title = PublicData.Title(o), passive = R(o, "PassiveVal"), evoke = R(o, "EvokeVal"), rules = PublicData.Localization(R(o, "Description")) }).ToArray(),
             pets = Items(R(pc, "Pets")).Select(p => new { id = R(p, "CombatId"), modelId = R(p, "ModelId").ToString(), hp = R(p, "CurrentHp"), maxHp = R(p, "MaxHp"), block = R(p, "Block"), powers = Powers(p) }).ToArray(), enemies = Enemies(combat) };
@@ -106,7 +106,7 @@ public static class PublicObservation
             }
         }
         var selection = context is CardSelectContext c ? new { min = c.MinSelect, max = c.MaxSelect,
-            purpose = c.Purpose is "FromSimpleGridForRewards" or "FromDeckGeneric" or "FromChooseACardScreen" ? null : c.Purpose,
+            purpose = c.Purpose is "FromSimpleGridForRewards" or "FromDeckGeneric" or "FromChooseACardScreen" ? null : c.Purpose,context=c.Context,
             cards = c.Cards.Select((card, index) => new { index, cardDetails = Card(card) }).ToArray() } : null;
         var hand = active ? PileType.Hand.GetPile(player).Cards.Select((card, index) => (object)new { index, id = PublicData.Id(card), title = PublicData.Title(card),
             cost = card.EnergyCost.CostsX ? "X" : card.EnergyCost.GetResolved().ToString(), targetType = card.TargetType.ToString(), cardDetails = Card(card), canPlay = card.CanPlay() }).ToArray() : Array.Empty<object>();
@@ -114,7 +114,7 @@ public static class PublicObservation
         var status = new { act = run.CurrentActIndex + 1, floor = run.TotalFloor, actFloor = run.ActFloor, hp = player.Creature.CurrentHp, maxHp = player.Creature.MaxHp,
             gold = player.Gold, block = player.Creature.Block, energy = active ? pc!.Energy : 0, maxEnergy = player.MaxEnergy, powers = Powers(player.Creature),
             character = PublicData.Id(player.Character), ascension = run.AscensionLevel, potionBelt = PublicData.Slots(player),
-            potions = player.Potions.Select(p => PublicData.Id(p)).ToArray(), relics = player.Relics.Select(PublicData.Id).ToArray(), relicDetails = player.Relics.Select(PublicData.Relic).ToArray(),
+            potions = player.Potions.Select(p => PublicData.Id(p)).ToArray(), relics = player.Relics.Select(PublicData.Id).ToArray(), relicDetails = player.Relics.Select(r=>PublicData.Relic(r,active?Cards.Reference:null)).ToArray(),
             deckCards = player.Deck.Cards.OrderBy(Cards.SortKey, StringComparer.Ordinal).Select((card, index) => new { index, cardDetails = Card(card) }).ToArray(),
             map = PublicData.Map(run), combat = combatView, room = new { type = run.CurrentRoom?.GetType().Name, id = P(run.CurrentRoom, "ModelId")?.ToString() } };
         var unavailable = new Dictionary<string, string> { ["intentIcons"] = "headless renderer", ["renderedCardText"] = "template and existing dynamic variables only" };
@@ -133,7 +133,7 @@ public static class PublicObservation
                 terminal = raw.IsTerminal ? raw.IsVictory ? "victory" : "death" : null }, actions,
             publicHistory = new { coverage = "current_recorded_segment_only", shopOffers = OfferHistory.Values.ToArray() },
             resolution = new { evidence = "native_coordinator_boundary", pendingChoice = selection != null || context is SpecialChoiceContext, parentEffectMayBePending = selection != null || context is SpecialChoiceContext },
-            capabilities = new { backend = "native_headless", gameVersion = "v0.111.0", observationRevision = "public-state-v3", renderedCardText = false,
+            capabilities = new { backend = "native_headless", gameVersion = "v0.111.0", observationRevision = "public-state-v4", renderedCardText = false,
                 diagnosticFixture = FixtureActions.Enabled, diagnosticFixtureResult = FixtureActions.Enabled ? FixtureActions.LastResult : null,
                 explicitMultiCardIndices = true, supportedCharacters = new[] { "IRONCLAD" }, supportedAscensions = new[] { 0 },
                 unavailable } };

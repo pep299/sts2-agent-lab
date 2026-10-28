@@ -32,10 +32,10 @@ class MentorRuntime:
         model_hash = sha(model)
         if 'model_sha256' in expected and model_hash != expected['model_sha256']:
             raise ValueError('Mentor model hash differs from configuration')
-        spec = importlib.util.spec_from_file_location('mentor_rs', library,
-                    loader=ExtensionFileLoader('mentor_rs', str(library)))
+        spec = importlib.util.spec_from_file_location('sts2_rs', library,
+                    loader=ExtensionFileLoader('sts2_rs', str(library)))
         self.engine = importlib.util.module_from_spec(spec)
-        sys.modules['mentor_rs'] = self.engine
+        sys.modules['sts2_rs'] = self.engine
         spec.loader.exec_module(self.engine)
         build_git = self.engine.build_git()
         if 'build_git' in expected and build_git != expected['build_git']:

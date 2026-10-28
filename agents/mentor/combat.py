@@ -2,6 +2,8 @@
 
 import json
 
+from agents.mentor.combat_history import apply_public_history
+
 AFFLICTIONS = {name.upper(): name for name in
                ('Bound', 'Entangled', 'Galvanized', 'Hexed', 'Ringing', 'Smog', 'Weighted', 'Tainted')}
 
@@ -59,19 +61,45 @@ def wire_cards(items, registries):
     output = []
     for i, item in enumerate(items):
         c = card_state(item)
-        if c.get('special'):
-            raise Unsupported(f'カードの付与・特殊値の戦闘接続は未実装: {c["id"]}')
         facts = c['facts']
         cost = facts['energyCost']
         row = {'id': resolve(c['id'], registries['card'], ('_CARD', '_STATUS')),
                'stable_idx': i, 'kind': {'Status': 'status', 'Curse': 'curse'}.get(facts['type'], 'card'),
-               'upgraded': c['upgrade'] > 0, 'base_cost': -1 if cost['costsX'] else cost['canonical'],
+               'upgraded': c['upgrade'] > 0,
                'cost_override': -1 if cost['costsX'] else cost['current'],
-               'flags': [k.lower() for k in c['keywords'] if k in {'Retain', 'Ethereal', 'Innate', 'Unplayable'}]}
+               'flags': [k.lower() for k in c['keywords'] if k in {'Retain', 'Sly', 'Ethereal', 'Innate', 'Unplayable'}]}
+        local_costs = ('local', 'afterTurn', 'afterPlay', 'afterTurnAndPlay')
+        if not all(type(cost.get(k)) is int for k in local_costs):
+            raise Unsupported('カードのローカル費用と失効後費用が揃っていない')
+        row['public_costs'] = {key: cost[key] for key in local_costs}
+        if type(cost.get('unmodified')) is not int or not isinstance(cost.get('modifiers'), list):
+            raise Unsupported('カードの未修飾費用と補正列が揃っていない')
+        modifiers = []
+        for modifier in cost['modifiers']:
+            if (modifier.get('type') not in {'Absolute', 'Relative'}
+                    or type(modifier.get('amount')) is not int
+                    or type(modifier.get('isReduceOnly')) is not bool
+                    or type(modifier.get('expiration')) is not int
+                    or modifier['expiration'] not in {0, 2, 4, 6}):
+                raise Unsupported('カードの費用補正を変換できない')
+            modifiers.append({'kind': modifier['type'].lower(), 'amount': modifier['amount'],
+                              'reduce_only': modifier['isReduceOnly'], 'expiration': modifier['expiration']})
+        row['local_cost'] = {'base': cost['unmodified'], 'costs_x': cost['costsX'], 'modifiers': modifiers}
+        for keyword, flag in [('Retain', 'retain_turn'), ('Sly', 'sly_turn')]:
+            if facts.get(keyword.lower()) and keyword not in c['keywords']:
+                row['flags'].append(flag)
         variables = {v['name']: v['baseValue'] for v in facts['dynamicVars']}
         for source, target in [('Damage', 'base_damage'), ('Block', 'base_block')]:
             if source in variables:
                 row[target] = int(variables[source])
+        if c.get('special'):
+            special = c['special']
+            level = special.get('fakeUpgradeLevel')
+            if (entry(c['id']) != 'WITHER' or type(level) is not int or level < 0
+                    or special.get('baseDamage') != 3 + 3 * level
+                    or variables.get('Damage') != special['baseDamage']):
+                raise Unsupported(f'カードの特殊値を整合検証できない: {c["id"]}')
+            row['base_damage'] = special['baseDamage']
         if c.get('enchantment'):
             effect = c['enchantment']
             row.update(enchantment=resolve(effect['id'], registries.get('enchantment', set())),
@@ -86,7 +114,32 @@ def wire_cards(items, registries):
     return output
 
 
+def wire_powers(items, registries):
+    output = []
+    for p in items:
+        if p.get('applierCombatId') is not None or p.get('targetCombatId') is not None:
+            raise Unsupported(f'付与元・対象を持つ効果の接続は未実装: {p["id"]}')
+        name = resolve(p['id'], registries['power'])
+        row = {'name': name, 'amount': p['amount']}
+        if 'displayAmount' not in p:
+            raise Unsupported(f'Power量と表示進捗が揃っていない: {p["id"]}')
+        row['display'] = p['displayAmount']
+        if p.get('facing') is not None:
+            if name != 'SURROUNDED' or p['facing'] not in {'Right', 'Left'}:
+                raise Unsupported(f'効果の公開方向を変換できない: {p["id"]}')
+            row['counter'] = {'Right': 0, 'Left': 1}[p['facing']]
+        if name == 'CRIMSON_MANTLE':
+            variables = {v['name']: v['baseValue'] for v in p.get('dynamicVars', [])}
+            if 'SelfDamage' not in variables:
+                raise Unsupported('Crimson Mantleの公開SelfDamageがない')
+            row['counter'] = variables['SelfDamage']
+        output.append(row)
+    return output
+
+
 def make_wire(observation, registries, engine=None):
+    if observation.get('capabilities', {}).get('observationRevision') != 'public-state-v4':
+        raise Unsupported('戦闘入力には量・表示・費用期限を区別するpublic-state-v4が必要')
     status = observation['state']['status']
     combat = status['combat']
     if combat is None:
@@ -95,12 +148,7 @@ def make_wire(observation, registries, engine=None):
         raise Unsupported('ペットの接続は未実装')
 
     def powers(items):
-        output = []
-        for p in items:
-            if p.get('facing') or p.get('applierCombatId') or p.get('targetCombatId'):
-                raise Unsupported(f'方向・付与元・対象を持つ効果の接続は未実装: {p["id"]}')
-            output.append({'name': resolve(p['id'], registries['power']), 'amount': p['amount']})
-        return output
+        return wire_powers(items, registries)
 
     encounter = []
     for enemy in combat['enemies']:
@@ -120,10 +168,13 @@ def make_wire(observation, registries, engine=None):
     deck['draw_pile'].sort(key=lambda c: json.dumps({k: v for k, v in c.items() if k != 'stable_idx'}, sort_keys=True))
     for i, c in enumerate(deck['draw_pile']):
         c['stable_idx'] = i
-    deck['master_deck'] = wire_cards(status['deckCards'], registries)
+    # Mentorの戦闘外デッキは、個体状態を持たないカードIDの多重集合。
+    deck['master_deck'] = [{'id': resolve(card_state(c)['id'], registries['card'], ('_CARD', '_STATUS')),
+                            'stable_idx': i, 'kind': 'card', 'upgraded': False}
+                           for i, c in enumerate(status['deckCards'])]
     deck['play_pile'] = wire_cards(combat.get('play', {}).get('cards', []), registries)
     wire = {'wire_version': 1, 'game_version': 'v0.111.0', 'phase': 'PlayerPlayPhase',
-            'round': combat['turn'], 'turn': combat['turn'], 'side': 'Player', 'combat_id': 0,
+            'round': combat['round'], 'turn': combat['turn'], 'side': combat['side'], 'combat_id': 0,
             'is_elite': room == 'Elite', 'intent_amounts': 'effective', 'deck': deck, 'encounter': encounter,
             'player': {'hp': status['hp'], 'max_hp': status['maxHp'], 'block': status['block'],
                        'energy': status['energy'], 'max_energy': combat['maxEnergy'],
@@ -132,11 +183,14 @@ def make_wire(observation, registries, engine=None):
                        'orbs': [{'type': resolve(entry(o['id']).removesuffix('_ORB'), registries.get('orb', set())),
                                  'passive': o['passive'], 'evoke': o['evoke']} for o in combat['orbs']],
                        'class': 'ironclad', 'gold': status['gold'], 'powers': powers(status['powers']),
-                       'relics': [{'id': resolve(r['id'], registries['relic']), 'counter': r['counter']}
-                                  for r in status['relicDetails']],
+                       'relics': [{'id': resolve(r['id'], registries['relic']), 'counter': r['counter'],
+                                   'is_melted': r.get('isMelted', False)}
+                                  for r in status['relicDetails']
+                                  if entry(r['id']) not in {'DOWSING_ROD', 'NEOWS_SACRIFICE'}],
                        'potions': [resolve(s['potion']['id'], registries['potion']) if s['potion'] else None
                                    for s in status['potionBelt']['slots']]},
             'rng': {'seed': 0, 'ascension': status['ascension']}}
+    apply_public_history(wire, status, wire_cards([{'state': c} for c in combat.get('drawKnownTop', [])], registries))
     return infer_enemy_moves(wire, engine) if engine is not None else wire
 
 

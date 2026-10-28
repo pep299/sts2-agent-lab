@@ -18,7 +18,7 @@ jobs:
       MENTOR_CONFIG: config/mentor.example.toml
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - run: make mentor-deps mentor-patch
+      - run: make mentor-deps
       - name: Read Rust version from upstream declaration
         run: |
           python3 - <<'PYTHON'
@@ -41,7 +41,7 @@ jobs:
         run: |
           package="$RUNNER_TEMP/mentor-chat"
           mkdir -p "$package"
-          cp local/mentor/mentor_rs.abi3.so "$package/"
+          cp local/mentor/sts2_rs.abi3.so "$package/"
           cp -a external/spire-mentor/sts2-pycli/data/ppo "$package/models"
           cp external/spire-mentor/LICENSE "$package/LICENSE"
           cp external/spire-mentor/NOTICE "$package/NOTICE"

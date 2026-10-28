@@ -1,6 +1,6 @@
 """MentorのPPO入力・候補変換と、非戦闘の行動選択規則。"""
 import math
-from sts2.observation import Unsupported, card_state, metadata
+from sts2.observation import Unsupported, card_state, entry, metadata
 
 
 class UnscoredSelection(Unsupported):
@@ -21,8 +21,10 @@ def reward_claims(observation, actions, declined=()):
 
 def card(item):
     c = card_state(item)
-    return {'id': c['id'], 'upgrade_level': c['upgrade'], 'keywords': c['keywords'],
-            'enchantment': c.get('enchantment')}
+    row = {'id': c['id'], 'upgrade_level': c['upgrade'], 'keywords': c['keywords']}
+    if effect := c.get('enchantment'):
+        row.update(enchantment=entry(effect['id']), enchantment_amount=effect['amount'])
+    return row
 
 
 class NoncombatPolicy:
@@ -106,28 +108,32 @@ class NoncombatPolicy:
                 'count_rule': 'take_cards_ranked_above_skip_up_to_maximum; no_joint_subset_evaluation'}
         if minimum == 0 and selection.get('parentRelic') not in {'CLAWS', 'GNARLED_HAMMER', 'KIFUDA'}:
             raise UnscoredSelection('任意枚数の選択に固定枚数規則がない')
-        # 共通観測の生成だけを既存Rustビルダーに任せる。
-        packet = self.engine.ppo_wire_obs(base | {'type': 'card_reward', 'cards': [], 'can_skip': True}, 'card_reward')
+        offered = [card(c) for c in cards]
+        packet = self.engine.ppo_wire_obs(base | {'type': 'card_reward', 'cards': offered, 'can_skip': True}, 'card_reward')
         obs = packet['obs']
         obs.pop('card_reward_option_ids', None)
         obs.pop('card_reward_option_upgraded', None)
+        enchantments = obs.pop('card_reward_option_enchantments')
         obs['phase'] = 'card_select'
-        pairs = [(card(c)['id'], bool(card(c)['upgrade_level'])) for c in cards]
+        pairs = [(c['id'], bool(c['upgrade_level'])) for c in offered]
         if 'transform' in purpose or 'enchant' in purpose:
             name = 'transform' if 'transform' in purpose else 'enchant'
-            deck = [(c['id'], bool(c['upgrade_level'])) for c in base['run_state']['master_deck']]
-            obs[f'{name}_select_deck_indices'] = [deck.index(pair) for pair in pairs]
+            deck = base['run_state']['master_deck']
+            obs[f'{name}_select_deck_indices'] = [deck.index(c) for c in offered]
             if name == 'enchant':
                 obs['pending_enchantment'] = selection.get('enchantment')
             kind = f'{name}_deck_card'
         elif 'remov' in purpose:
             obs['card_removal_options'] = pairs
+            obs['card_removal_option_enchantments'] = enchantments
             kind = 'remove_deck_card'
         elif 'upgrad' in purpose:
             obs['smith_options'] = [pair[0] for pair in pairs]
+            obs['smith_option_enchantments'] = enchantments
             kind = 'smith_card'
         elif any(word in purpose for word in ('obtain', 'add', 'grant', 'copy')):
             obs['card_grant_options'] = pairs
+            obs['card_grant_option_enchantments'] = enchantments
             kind = 'grant_deck_card'
         else:
             raise UnscoredSelection(f'選択目的がモデル採点へ未対応: {selection.get("purpose")}')
@@ -150,11 +156,12 @@ class NoncombatPolicy:
         offered = [metadata(a)['bundle_index'] for a in actions]
         if len(set(offered)) != len(offered) or set(offered) != set(range(len(bundles))):
             raise Unsupported('カード束と実行候補の対応が不正')
-        packet = self.engine.ppo_wire_obs(base | {'type': 'card_reward', 'cards': [], 'can_skip': True}, 'card_reward')
+        flattened = [card(c) for bundle in bundles for c in bundle]
+        packet = self.engine.ppo_wire_obs(base | {'type': 'card_reward', 'cards': flattened, 'can_skip': True}, 'card_reward')
         packet['obs']['phase'] = 'card_select'
         packet['obs'].pop('card_reward_option_ids', None)
         packet['obs'].pop('card_reward_option_upgraded', None)
-        flattened = [card(c) for bundle in bundles for c in bundle]
+        packet['obs']['card_grant_option_enchantments'] = packet['obs'].pop('card_reward_option_enchantments')
         packet['obs']['card_grant_options'] = [(c['id'], bool(c['upgrade_level'])) for c in flattened]
         packet['actions'] = [{'action': 'grant_deck_card', 'idx': i} for i in range(len(flattened))]
         probs, value = self.distribution(packet)

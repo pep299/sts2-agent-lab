@@ -74,6 +74,7 @@ public static class FullAppBridgeMod
             Path.Combine(OS.GetUserDataDir(), "bridge_port.txt");
 
         Harmony harmony = new("sts2-native-sim.full-app-bridge");
+        KnownDrawTop.EnsureApplied();
         PresentationSuppression.Apply(harmony);
         CardSelectBridge.Apply(harmony);
         SpecialChoices.Apply(harmony);

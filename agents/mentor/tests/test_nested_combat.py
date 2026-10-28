@@ -6,14 +6,16 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from agents.mentor.combat import AFFLICTIONS, Unsupported, infer_enemy_moves
-from agents.mentor.nested_combat import align_choice, public_projection, resume_choice, search_indices
+from agents.mentor.nested_combat import align_choice, align_public_boundary, public_projection, resume_choice, search_indices
 from agents.mentor.policy import Mentor
 from agents.mentor.runtime import default_config
 
 
+def card(name, **extra):
+    return {'id': name, 'stable_idx': 0, 'kind': 'card', 'upgraded': False, **extra}
+
+
 def wire():
-    def card(name):
-        return {'id': name, 'stable_idx': 0, 'kind': 'card', 'upgraded': False}
     return {'wire_version': 1, 'game_version': 'v0.111.0', 'phase': 'PlayerPlayPhase',
         'round': 1, 'turn': 1, 'side': 'Player', 'combat_id': 0, 'intent_amounts': 'effective', 'is_elite': False,
         'deck': {'hand': [card('ANGER'), card('PREPARED')],
@@ -34,11 +36,16 @@ class ReplayContract(unittest.TestCase):
 
     def prepared_outcome(self):
         before = self.engine.state_to_dict(self.engine.state_from_dict(wire()))
+        before.update(public_draws=[], public_instances={})
         actual = deepcopy(before)
         actual['deck']['draw_pile'].reverse()
         state = self.engine.state_from_dict(actual)
         state.apply({'action': 'play', 'card_index': 1})
-        return before, self.engine.state_to_dict(state)
+        current = self.engine.state_to_dict(state)
+        drawn = current['deck']['hand'][-1]
+        current['public_draws'] = [{'sequence': 0, 'card': {
+            'id': 'CARD.' + drawn['id'], 'instance': 123, 'upgraded': drawn['upgraded']}}]
+        return before, current
 
     def test_already_visible_draw_is_replayed_without_next_draw_knowledge(self):
         before, current = self.prepared_outcome()
@@ -66,6 +73,31 @@ class ReplayContract(unittest.TestCase):
                 self.assertEqual([c['id'] for c in result['exhaust_pile']], ['WISH'])
                 self.assertFalse(state.has_pending_play())
 
+    def test_candidate_normalization_preserves_context_without_creating_hand_cards(self):
+        state = self.engine.state_from_dict(wire())
+        original = self.engine.state_to_dict(state)
+        candidates = [{'id': 'BARRICADE', 'kind': 'card', 'stable_idx': 0, 'upgraded': False, 'cost_override': 0,
+            'flags': ['retain_turn', 'sly_turn'],
+            'local_cost': {'base': 3, 'costs_x': False, 'modifiers': [
+                {'kind': 'absolute', 'amount': 0, 'reduce_only': False, 'expiration': 6}]}}]
+        saved = deepcopy(candidates)
+        normalized = state.normalize_public_cards(candidates)
+        self.assertEqual(normalized[0]['id'], 'BARRICADE_CARD')
+        self.assertEqual(set(normalized[0]['flags']), {'retain_turn', 'sly_turn'})
+        self.assertEqual(normalized[0]['public_costs'],
+                         {'local': 0, 'afterTurn': 3, 'afterPlay': 3, 'afterTurnAndPlay': 3})
+        self.assertEqual(normalized[0]['cost_override'], 0)
+        self.assertEqual(candidates, saved)
+        self.assertEqual(self.engine.state_to_dict(state), original)
+        with self.assertRaises(ValueError):
+            state.normalize_public_cards([dict(candidates[0], id='UNKNOWN_CARD')])
+        wish = wire()
+        wish['deck']['hand'] = [{'id': 'WISH', 'stable_idx': 0, 'kind': 'card', 'upgraded': False}]
+        active = self.engine.state_from_dict(wish)
+        active.normalize_public_cards(candidates)
+        active.apply({'action': 'play', 'card_index': 0})
+        self.assertEqual(active.pending_choice()['kind'], 'add_from_draw_to_hand')
+
     def test_wish_zero_or_one_candidate_does_not_open_a_choice(self):
         for count in (0, 1):
             with self.subTest(count=count):
@@ -79,7 +111,77 @@ class ReplayContract(unittest.TestCase):
                 result = self.engine.state_to_dict(state)['deck']
                 self.assertEqual(sum(c['id'] == 'BASH' for c in result['hand']), count)
 
-    def test_wish_override_survives_state_reconstruction_and_search(self):
+    def test_generated_choice_rejects_unrepresentable_instance_flags_without_mutation(self):
+        for name, flag in [('ANGER', 'retain_turn'), ('ANGER', 'sly_turn'), ('ANGER', 'sly'), ('HAZE', 'sly')]:
+            with self.subTest(name=name, flag=flag):
+                state = self.engine.state_from_dict(wire())
+                state.open_generated_choice('add_generated_to_hand', [card('ANGER')], 1, 1, False)
+                before = self.engine.state_to_dict(state)
+                pending = state.pending_choice()
+                with self.assertRaisesRegex(ValueError, 'cannot preserve instance flag'):
+                    state.open_generated_choice('add_generated_to_hand', [
+                        card('BASH'), card(name, flags=[flag])], 1, 1, False)
+                self.assertEqual(self.engine.state_to_dict(state), before)
+                self.assertEqual(state.pending_choice(), pending)
+
+    def test_invalid_generated_replacement_preserves_cards_and_pending_choice(self):
+        state = self.engine.state_from_dict(wire())
+        state.open_generated_choice('add_generated_to_hand', [card('ANGER')], 1, 1, False)
+        before = self.engine.state_to_dict(state)
+        pending = state.pending_choice()
+        for cards, low, high in [([card('UNKNOWN_CARD')], 1, 1),
+                                  ([card('BASH')], 2, 1), ([card('BASH')], 0, 2)]:
+            with self.subTest(cards=cards, low=low, high=high):
+                with self.assertRaises(ValueError):
+                    state.open_generated_choice('add_generated_to_hand', cards, low, high, False)
+                self.assertEqual(self.engine.state_to_dict(state), before)
+                self.assertEqual(state.pending_choice(), pending)
+        state.resolve_public_choice([0])
+        self.assertEqual(self.engine.state_to_dict(state)['deck']['hand'][-1]['id'], 'ANGER')
+
+    def test_invalid_injected_replacement_preserves_parent_and_post_effect(self):
+        source = wire()
+        source['deck']['hand'] = [card('BRAND'), card('ANGER'), card('DEFEND_IRONCLAD')]
+        state = self.engine.state_from_dict(source)
+        state.apply({'action': 'play', 'card_index': 0})
+        before = self.engine.state_to_dict(state)
+        pending = state.pending_choice()
+        for options, low, high in [([dict(pending['cards'][0], id='UNKNOWN_CARD')], 1, 1),
+                                    (pending['cards'], 2, 1), (pending['cards'], 0, 3)]:
+            with self.subTest(low=low, high=high):
+                with self.assertRaises(ValueError):
+                    state.open_injected_choice(pending['kind'], options, low, high, False, True)
+                self.assertEqual(self.engine.state_to_dict(state), before)
+                self.assertEqual(state.pending_choice(), pending)
+        state.open_injected_choice(pending['kind'], pending['cards'], 1, 1, False, True)
+        state.resolve_public_choice([0])
+        after = self.engine.state_to_dict(state)
+        self.assertIn('ANGER', [c['id'] for c in after['deck']['exhaust_pile']])
+        self.assertEqual(next(p['amount'] for p in after['player']['powers'] if p['name'] == 'STRENGTH'), 1)
+        self.assertFalse(state.has_pending_play())
+
+    def test_v111_granted_sly_is_distinct_from_older_intrinsic_sly(self):
+        source = wire()
+        source['deck']['hand'] = [card('HAZE', flags=['sly'])]
+        state = self.engine.state_from_dict(source)
+        self.assertIn('sly', self.engine.state_to_dict(state)['deck']['hand'][0]['flags'])
+        source['deck']['hand'][0]['flags'] = []
+        state = self.engine.state_from_dict(source)
+        self.assertNotIn('sly', self.engine.state_to_dict(state)['deck']['hand'][0].get('flags', []))
+
+    def test_generated_candidate_cost_check_happens_before_choice_replacement(self):
+        state = self.engine.state_from_dict(wire())
+        state.open_generated_choice('add_generated_to_hand', [card('ANGER')], 1, 1, False)
+        pending = state.pending_choice()
+        candidates = [{'id': 'BARRICADE_CARD', 'stable_idx': 0, 'kind': 'card', 'upgraded': False, 'cost_override': 0,
+            'local_cost': {'base': 3, 'costs_x': False, 'modifiers': [
+                {'kind': 'absolute', 'amount': 0, 'reduce_only': False, 'expiration': 6}]},
+            'public_costs': {'local': 0, 'afterTurn': 0, 'afterPlay': 0, 'afterTurnAndPlay': 0}}]
+        with self.assertRaisesRegex(Unsupported, 'public_costs'):
+            align_public_boundary(self.engine, state, candidates)
+        self.assertEqual(state.pending_choice(), pending)
+
+    def test_wish_choice_survives_state_reconstruction_and_search(self):
         source = wire()
         source['deck']['hand'] = [{'id': 'WISH', 'stable_idx': 0, 'kind': 'card', 'upgraded': False}]
         state = self.engine.state_from_dict(source)
@@ -110,7 +212,7 @@ class ReplayContract(unittest.TestCase):
         state.apply({'action': 'play', 'card_index': 0})
         current = self.engine.state_to_dict(state)
         offered = list(reversed(current['deck']['draw_pile']))
-        align_choice(self.engine, state, current, offered)
+        align_choice(self.engine, state, offered)
         self.assertEqual([c['index'] for c in state.pending_choice()['cards']], [1, 0])
         state.apply({'action': 'choose', 'index': 0, 'selection': [0]})
         hand = self.engine.state_to_dict(state)['deck']['hand']
@@ -121,7 +223,7 @@ class ReplayContract(unittest.TestCase):
         state.apply({'action': 'play', 'card_index': 0})
         offered[1]['enchantment_amount'] = 99
         with self.assertRaisesRegex(Unsupported, '属性が再生中'):
-            align_choice(self.engine, state, current, offered)
+            align_choice(self.engine, state, offered)
 
     def test_catastrophe_reconstructs_only_an_already_visible_random_outcome(self):
         source = wire()
@@ -223,6 +325,7 @@ class ReplayContract(unittest.TestCase):
     def test_unexplainable_draw_is_rejected(self):
         before, current = self.prepared_outcome()
         current['deck']['hand'][-1]['id'] = 'BASH'
+        current['public_draws'][0]['card']['id'] = 'CARD.BASH'
         with self.assertRaisesRegex(Unsupported, '公開済みドロー'):
             resume_choice(self.engine, before, {'action': 'play', 'card_index': 1}, current)
 
@@ -275,12 +378,13 @@ class ReplayContract(unittest.TestCase):
         self.assertEqual((exported['enchantment'], exported['enchantment_amount'], exported['cost_override']),
                          ('Instinct', 1, 0))
 
-    def test_public_comparison_does_not_claim_unobserved_internal_counters(self):
+    def test_public_comparison_checks_history_without_comparing_unobservable_storage(self):
         before, current = self.prepared_outcome()
         expected = public_projection(current)
-        current['player']['cards_played_this_turn'] = [1, 0, 0, 0, 0]
         current['deck']['hand'][0]['combat_vars'] = {'free_until_played': 0}
         self.assertEqual(public_projection(current), expected)
+        current['player']['cards_played_this_turn'] = [1, 0, 0, 0, 0]
+        self.assertNotEqual(public_projection(current), expected)
         current['player']['hp'] -= 1
         self.assertNotEqual(public_projection(current), expected)
 
