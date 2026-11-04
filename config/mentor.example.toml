@@ -1,10 +1,10 @@
 [paths]
 extension = "local/mentor/sts2_rs.abi3.so"
-model = "external/spire-mentor/sts2-pycli/data/ppo/ppo_fullrun_ironclad_cardmods_it850.onnx"
+model = "external/spire-mentor/sts2-pycli/data/ppo/ppo_fullrun_ironclad_cont300_it1150.onnx"
 
 [identity]
-build_git = "7fd4dd9066f6bf1683f8da32f0f55976c9e92373"
-model_sha256 = "a89010583715c6b68595ee918e2e8ecc698f36d5e4b048426e5fbec7973f3a86"
+build_git = "2e5da07698b54d365e97bab49bff4783e739d810"
+model_sha256 = "ba540b7e3b72f0dcffdee5ef95c787bd014e4ff46ca8a4b01464437cc089232e"
 features = "card_mods,reward_upgrade"
 
 [search]
