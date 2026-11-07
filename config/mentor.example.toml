@@ -3,7 +3,7 @@ extension = "local/mentor/sts2_rs.abi3.so"
 model = "external/spire-mentor/sts2-pycli/data/ppo/ppo_fullrun_ironclad_cont300_it1150.onnx"
 
 [identity]
-build_git = "2e5da07698b54d365e97bab49bff4783e739d810"
+build_git = "0c5b6fa9f2c4b8eb2ccbdc9d471bb8a1ccc3194c"
 model_sha256 = "ba540b7e3b72f0dcffdee5ef95c787bd014e4ff46ca8a4b01464437cc089232e"
 features = "card_mods,reward_upgrade"
 
