@@ -37,40 +37,16 @@ jobs:
           CARGO_PROFILE_RELEASE_OPT_LEVEL: '1'
         run: make mentor-build
       - run: make mentor-test
-      - run: make mentor-chat-test
       - name: Prepare Mentor for Chat
         run: |
           package="$RUNNER_TEMP/mentor-chat"
-          mkdir -p "$package/localization"
+          mkdir -p "$package"
           cp local/mentor/sts2_rs.abi3.so chat/mentor_chat.py chat/README.md "$package/"
           cp external/spire-mentor/LICENSE external/spire-mentor/NOTICE "$package/"
           cp external/spire-mentor/sts2-rs/LICENSE "$package/LICENSE-rust"
-          for source in external/spire-mentor/sts2-pycli/localization_eng_v*; do
-            if [ -d "$source" ]; then
-              version="${source##*/localization_eng_}"
-              cp -a "$source" "$package/localization/$version"
-            fi
-          done
-          python3 - "$package" <<'PYTHON'
-          import hashlib
-          import json
-          from pathlib import Path
-          import subprocess
-          import sys
-
-          package = Path(sys.argv[1])
-          def git(*args):
-              return subprocess.check_output(["git", *args], text=True).strip()
-          manifest = {
-              "lab_commit": git("rev-parse", "HEAD"),
-              "mentor_commit": git("-C", "external/spire-mentor", "rev-parse", "HEAD"),
-              "files": {
-                  name: hashlib.sha256((package / name).read_bytes()).hexdigest()
-                  for name in ("sts2_rs.abi3.so", "mentor_chat.py")
-              },
-          }
-          (package / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-          PYTHON
+          cp -a external/spire-mentor/sts2-pycli "$package/"
+      - name: Test Mentor Chat package
+        run: PYTHONPATH="$RUNNER_TEMP/mentor-chat" python3 -B -m unittest discover -s chat/tests
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         id: upload
         if: github.ref == 'refs/heads/main'
