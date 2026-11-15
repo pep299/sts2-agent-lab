@@ -9,8 +9,6 @@ nativeブリッジと共有投影は**独自保守**とし、上流HEADへの定
 
 ゲーム対応更新や不具合修正では、上流差分から原因に関係する変更だけを選び、この実行器の回帰試験を通して採用する。採用元のcommitは取り込みcommitに記録する。通信型・描画抑制を含めmod全体がこちらの保守対象となる。
 
-`external/sts2-sim`は独立したsubmoduleで、そちらのライセンスに従う。ゲーム本体・資源・保存データはこのrepoのMIT許諾対象ではない。本プロジェクトはMega Critの公式製品・提携プロジェクトではない。
+ゲーム本体・資源・保存データはこのrepoのMIT許諾対象ではない。本プロジェクトはMega Critの公式製品・提携プロジェクトではない。
 
 `external/spire-mentor`は[Spire Mentor](https://github.com/tfriedel/spire-mentor)由来の[保守fork](https://github.com/pep299/spire-mentor)を固定commitで参照するsubmodule。ソース・配布学習済みネットワークのMIT許諾は同submoduleの`LICENSE`・`NOTICE`に従う。`agents/mentor`は標準Python拡張・モデルを利用する公開観測アダプター。更新時は固定commit・モデルSHA・回帰試験を揃えて変更する。
-
-`external/learn-the-spire`は[pep299/learn-the-spire](https://github.com/pep299/learn-the-spire)のv0.111対応と公開観測アドオンを固定commitで参照する。元実装のUnlicenseと、取り込まれた第三者コードの許諾は同submoduleの`LICENSE`・`NOTICE.md`を参照する。ゲームDLLは含めず、所有する入力をビルド時に指定する。

@@ -95,7 +95,7 @@ class FixedCases(unittest.TestCase):
         self.assertEqual(checks.check_expectations(self.spec, [self.record]), [])
 
     def invoke(self, arguments, result):
-        with patch.object(checks.sys, 'argv', ['run.py', '--backend', 'native', '--output', 'local/unused'] + arguments), \
+        with patch.object(checks.sys, 'argv', ['run.py', '--output', 'local/unused'] + arguments), \
                 patch.object(checks, 'run', return_value=result) as run, patch.object(checks.sys, 'stderr', StringIO()), \
                 self.assertRaises(SystemExit) as exit_result:
             checks.main()
