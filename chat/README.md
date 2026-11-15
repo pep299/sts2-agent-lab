@@ -1,12 +1,28 @@
 # ChatでMentorを使う
 
-artifactの取得先を渡すかZIPを添付し、次を指示する。
+取得先が登録されたChatでは、次の一言で開始する。
 
 ```text
-artifact内のREADME.mdに従ってランを開始して。
-v0.113.0、アイアンクラッド、A10、seed=7。
-まずマップとエンシェントの全選択肢を見せて止めて。
+gh artifactからパッケージ取得してラン開始
 ```
+
+既定値はv0.113.0・アイアンクラッド・A10・ランダムseed。指定された項目だけ上書きし、未指定の開始条件について確認を求めない。
+
+```text
+gh artifactからパッケージ取得してラン開始。サイレント、A5
+gh artifactからパッケージ取得してラン開始。seed=7
+```
+
+### 取得先の初回登録
+
+新しいチャットでも取得先を省略する場合は、ChatGPTプロジェクトの指示に以下を一度登録する。[プロジェクトの指示は同じプロジェクトのチャットに適用される](https://learn.chatgpt.com/docs/projects)。この会話内で取得先を伝えて使う場合は、プロジェクトへの登録は不要。
+
+```text
+「gh artifactからパッケージ取得してラン開始」と言われたら、GitHubのpep299/sts2-agent-labで、mainの最新の成功したMentorワークフローからmentor-chat artifactを取得・展開する。
+同梱README.mdに従って新規ランを開始し、ユーザー指定の開始条件を既定値より優先する。
+```
+
+Chatは利用可能なGitHub接続ツールで取得する。取得できない場合はエラーを報告して停止する。ZIPが添付されていれば、それを展開して同梱READMEを使う。
 
 再開する場合は、開始時と同じartifact ZIPと保存JSONを渡す。
 
@@ -31,16 +47,13 @@ package = Path('/mnt/data/mentor-chat')  # 実際の展開先へ置き換える
 sys.path.insert(0, str(package))
 from mentor_chat import Session
 
-session = Session.start(
-    game_version='v0.113.0', seed=7, character='Ironclad',
-    ascension_level=10, act1='roll',
-)
+session = Session.start()
 state = session.observe()
 ```
 
-開始条件はユーザー指定に置き換える。文字列seedも渡せる。起動時に要求版が拒否されたら例外全文を報告し、別版で進めない。
+指定があれば`character`・`ascension_level`・`seed`・`game_version`等の引数へ渡す。例えば「サイレント、A5」は`Session.start(character='Silent', ascension_level=5)`。文字列seedも渡せる。キャラクターや要求版が拒否されたら例外全文を報告し、別の開始条件で進めない。
 
-最初にゲーム版・キャラクター・アセンション・seed、現在Actのマップとエンシェントの全選択肢を提示し、選択・移動前に停止する。
+最初にゲーム版・キャラクター・アセンション・実際に使用したseed・HP・所持金、現在Actのマップ画像とネオー等のエンシェントの全選択肢・効果を提示し、選択・移動前に停止する。開始条件は`session.config`から読み、seed未指定時の値も表示する。再開・分岐でseedを引き直さない。
 
 ### 取得・行動
 

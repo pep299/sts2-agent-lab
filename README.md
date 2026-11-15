@@ -8,7 +8,7 @@ Slay the Spire 2のAIエージェント開発に向けた調査・実験。
 
 Mentorの推論拡張を手元で作る場合は`make mentor-deps mentor-build`、確認済み拡張があれば設定の`paths.extension`へ指定する。方策の設定例は`config/mentor.example.toml`。
 
-ChatでRustシミュレータを操作する方法は[Chat利用手順](chat/README.md)を参照。GitHub Actionsの`mentor-chat` artifactにPython拡張・手順・保存と分岐の補助・対象版の説明データ・ビルド元を同梱する。
+ChatでRustシミュレータを操作する方法は[Chat利用手順](chat/README.md)を参照。取得先を一度登録すると「gh artifactからパッケージ取得してラン開始」で起動する。既定値はv0.113.0・アイアンクラッド・A10・ランダムseedで、指定した項目だけ上書きする。GitHub Actionsの`mentor-chat` artifactにPython拡張・手順・保存と分岐の補助・対象版の説明データ・ビルド元を同梱する。
 
 ```bash
 python3 -m agents.mentor --help

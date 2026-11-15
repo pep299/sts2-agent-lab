@@ -36,6 +36,27 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(session.history, [])
         self.assertEqual(before, session._check(session.rm))
 
+    def test_random_seed_is_saved_and_reused(self):
+        session = Session.start(game_version="v0.111.0")
+        seed = session.config["seed"]
+        self.assertIs(type(seed), int)
+        self.assertTrue(0 <= seed < 2 ** 31)
+        with tempfile.TemporaryDirectory() as directory:
+            saved = Path(directory) / "run.json"
+            session.save(saved)
+            restored = Session.load(saved)
+        self.assertEqual(restored.config["seed"], seed)
+        self.assertEqual(restored.observe(), session.observe())
+        self.assertEqual(session.fork(0).config["seed"], seed)
+
+    def test_explicit_start_parameters_are_used(self):
+        session = Session.start(game_version="v0.111.0", character="Silent",
+                                ascension_level=5, seed=7)
+        self.assertEqual(session.rm.character, "Silent")
+        self.assertEqual(session.rm.ascension_level, 5)
+        self.assertEqual(session.config["seed"], 7)
+        self.assertEqual(session.observe()["game_version"], "v0.111.0")
+
     def test_combat_trace_fork_and_fresh_process_restore(self):
         session = self.start()
         self.enter_combat(session)

@@ -4,6 +4,7 @@ from copy import deepcopy
 from hashlib import sha256
 import json
 from pathlib import Path
+from secrets import randbits
 
 
 def _json(value):
@@ -44,8 +45,10 @@ class Session:
         self.initial_check = self._check(self.rm)
 
     @classmethod
-    def start(cls, *, game_version, seed=7, character="Ironclad", ascension_level=10,
+    def start(cls, *, game_version="v0.113.0", seed=None, character="Ironclad", ascension_level=10,
               act1="roll"):
+        if seed is None:
+            seed = randbits(31)
         config = dict(game_version=game_version, character=character,
                       ascension_level=ascension_level, act1=act1, neow_start=True,
                       mode="agent", interactive_potion_swap=True)
