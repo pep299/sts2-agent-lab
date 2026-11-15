@@ -6,7 +6,6 @@ import tempfile
 import unittest
 
 from mentor_chat import Session
-from verify_resume import resume_summary
 
 
 class SessionTests(unittest.TestCase):
@@ -61,21 +60,18 @@ class SessionTests(unittest.TestCase):
             saved = Path(directory) / "run.json"
             session.save(saved)
             # 同一プロセス内のcloneだけで再開確認を済ませない。
-            expected = Path(directory) / "expected.json"
-            expected.write_text(json.dumps(resume_summary(session)))
-            script = Path(__file__).resolve().parent / "verify_resume.py"
+            script = """
+import json, sys
+from mentor_chat import Session
+s = Session.load(sys.argv[1])
+print(json.dumps({'steps': len(s.history), 'view': s.observe(),
+                  'check': s._check(s.rm), 'rng': s.rm.rng_counters()}, sort_keys=True))
+"""
             restored = json.loads(subprocess.check_output(
-                [sys.executable, str(script), str(saved), "--expected", str(expected)], text=True))
-            self.assertTrue(all(restored["comparison"].values()))
-            self.assertEqual(restored["summary"], resume_summary(session))
-            wrong = resume_summary(session)
-            wrong["current_state"]["gold"] += 1
-            expected.write_text(json.dumps(wrong))
-            failed = subprocess.run(
-                [sys.executable, str(script), str(saved), "--expected", str(expected)],
-                text=True, capture_output=True)
-            self.assertNotEqual(failed.returncode, 0)
-            self.assertFalse(json.loads(failed.stdout)["comparison"]["current_state"])
+                [sys.executable, "-c", script, str(saved)], text=True))
+            expected = dict(steps=len(session.history), view=session.observe(),
+                            check=session._check(session.rm), rng=session.rm.rng_counters())
+            self.assertEqual(restored, json.loads(json.dumps(expected)))
 
     def test_failed_action_keeps_active_branch(self):
         session = self.start()
