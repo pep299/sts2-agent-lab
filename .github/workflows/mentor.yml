@@ -37,15 +37,9 @@ jobs:
           CARGO_PROFILE_RELEASE_OPT_LEVEL: '1'
         run: make mentor-build
       - run: make mentor-test
+      - run: make mentor-chat-test
       - name: Prepare Mentor for Chat
-        run: |
-          package="$RUNNER_TEMP/mentor-chat"
-          mkdir -p "$package"
-          cp local/mentor/sts2_rs.abi3.so "$package/"
-          cp -a external/spire-mentor/sts2-pycli/data/ppo "$package/models"
-          cp external/spire-mentor/LICENSE "$package/LICENSE"
-          cp external/spire-mentor/NOTICE "$package/NOTICE"
-          cp external/spire-mentor/sts2-rs/LICENSE "$package/LICENSE-rust"
+        run: python3 scripts/package_mentor_chat.py --output "$RUNNER_TEMP/mentor-chat"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         id: upload
         if: github.ref == 'refs/heads/main'

@@ -22,7 +22,7 @@ MENTOR_SOURCE := external/spire-mentor
 MENTOR_TARGET := $(CURDIR)/local/mentor/target
 MENTOR_LIB_EXT := $(if $(filter Darwin,$(shell uname -s)),dylib,so)
 
-.PHONY: mentor-deps mentor-build mentor-test sts2-test
+.PHONY: mentor-deps mentor-build mentor-test mentor-chat-test sts2-test
 
 mentor-deps:
 	git submodule update --init --recursive $(MENTOR_SOURCE)
@@ -38,6 +38,9 @@ transport-test:
 
 mentor-test:
 	$(PYTHON) -B -m unittest discover -s agents/mentor/tests
+
+mentor-chat-test:
+	PYTHONPATH=chat:local/mentor $(PYTHON) -B -m unittest discover -s chat/tests
 
 sts2-test:
 	$(PYTHON) -B -m unittest discover -s sts2/tests
