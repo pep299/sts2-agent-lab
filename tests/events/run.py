@@ -5,10 +5,8 @@ from contextlib import redirect_stderr
 import hashlib
 from io import StringIO
 import json
-import os
 from pathlib import Path
 import re
-import subprocess
 import sys
 import time
 import traceback
@@ -17,11 +15,10 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
 from agents.mentor.policy import Mentor
 from agents.mentor.runtime import default_config
-from backends.learn_dll.learn_environment import LearnEnvironment
 from sts2.observation import card_state, metadata
 
 SOURCE_HASHES = {str(path.relative_to(REPO)): hashlib.sha256(path.read_bytes()).hexdigest()
-                for folder in ('agents/mentor', 'sts2', 'backends/learn_dll', 'tests/events')
+                for folder in ('agents/mentor', 'sts2', 'tests/events')
                 for path in (REPO / folder).glob('*.py')}
 
 
@@ -71,34 +68,6 @@ def outcome_state(boundary):
         'phase': state['phase'], 'terminal': state['terminal'],
         'deck': [card_state(card) for card in status['deckCards']], 'potions': status['potionBelt'],
         **({'relicDetails': status['relicDetails']} if 'relicDetails' in status else {})}
-
-
-class LearnFixture(LearnEnvironment):
-    def __init__(self, args, output):
-        self.output = output
-        output.mkdir(parents=True, exist_ok=False)
-        self.host = args.fixture_host.resolve()
-        self.stderr = (output / 'host-stderr.log').open('x')
-        try:
-            command = [str(args.dotnet), str(self.host), '--host-dir', str(args.learn_host_dir), '--log', str(output / 'events.jsonl')]
-            self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                stderr=self.stderr, bufsize=0, cwd=REPO)
-        except BaseException:
-            self.stderr.close()
-            raise
-        os.set_blocking(self.process.stdout.fileno(), False)
-        self.timeout = args.seconds
-        self.steps = self.decision_id = 0
-        self.last = None
-        self.deadline = time.monotonic() + args.seconds
-
-    def begin(self, event, args):
-        return self.request({'cmd': 'reset_event', 'eventName': event['name'], 'seed': args.seed,
-                             'hp': args.hp, 'maxHp': args.max_hp, 'gold': args.gold,
-                             **getattr(args, 'fixture', {})}, self.deadline)
-
-    def step(self, decision):
-        return super().step(decision, self.deadline)
 
 
 class NativeFixture:
@@ -221,7 +190,7 @@ def succeeded(summary):
 def one_case(args, event, prefix, output, schedule, executed):
     started = time.monotonic()
     env = None
-    report = {'event': event, 'backend': args.backend, 'fixture': True, 'expertData': False,
+    report = {'event': event, 'backend': 'native', 'fixture': True, 'expertData': False,
               'prefix': prefix, 'status': 'fault', 'semanticEffectVerified': False,
               'coverage': 'event-option branches at one declared initial state; card combinations and RNG outcomes not exhaustive',
               'sourceSha256': SOURCE_HASHES,
@@ -232,14 +201,10 @@ def one_case(args, event, prefix, output, schedule, executed):
               'trace': [], 'mentorDecisions': 0, 'forcedDecisions': 0}
     try:
         args.event = event
-        env = LearnFixture(args, output) if args.backend == 'learn' else NativeFixture(args, output)
+        env = NativeFixture(args, output)
         raw = env.begin(event, args)
         if 'fixtureInitialization' in raw:
             report['fixtureInitialization'] = raw['fixtureInitialization']
-        elif args.backend == 'learn':
-            initializations = [json.loads(line)['data'] for line in (output / 'events.jsonl').read_text().splitlines()
-                              if json.loads(line)['kind'] == 'event_fixture_initialized']
-            report['fixtureInitialization'] = initializations[-1] if initializations else None
         boundary = public_boundary(raw)
         state = boundary['observation']['state']
         if state['phase'] == 'event' and state.get('eventId') and state['eventId'].split('.', 1)[-1] != event_id(event):
@@ -306,18 +271,12 @@ def one_case(args, event, prefix, output, schedule, executed):
     finally:
         if env is not None:
             closing = env.close()
-            if args.backend == 'learn':
-                report.update(processReaped=env.process.poll() is not None, exitCode=env.process.returncode)
-                errors = [line for line in (output / 'host-stderr.log').read_text().splitlines() if '[ERROR]' in line]
-                if env.process.returncode != 0 or errors:
-                    report.update(status='fault', shutdownOrHostErrors=errors)
-            else:
-                report['nativeResult'] = closing
-                report.update(processReaped=closing['processReaped'], exitCode=closing.get('exitCode'))
-                if (closing.get('unreviewedNativeErrorCount') or closing.get('faultCategory')
-                        or closing.get('exitCode') != 0 or closing['processReaped'] is not True):
-                    report.update(status='fault', shutdownOrHostErrors=closing.get('error') or
-                                  'Native終了時のexitCode/processReaped/エラー記録が正常ではない')
+            report['nativeResult'] = closing
+            report.update(processReaped=closing['processReaped'], exitCode=closing.get('exitCode'))
+            if (closing.get('unreviewedNativeErrorCount') or closing.get('faultCategory')
+                    or closing.get('exitCode') != 0 or closing['processReaped'] is not True):
+                report.update(status='fault', shutdownOrHostErrors=closing.get('error') or
+                              'Native終了時のexitCode/processReaped/エラー記録が正常ではない')
         report['seconds'] = time.monotonic() - started
         output.mkdir(parents=True, exist_ok=True)
         write(output / 'case.json', report)
@@ -364,11 +323,11 @@ def run(args):
                          'error': result.get('error'), 'mentorDecisions': result['mentorDecisions'],
                          'forcedDecisions': result['forcedDecisions']})
             print(json.dumps(rows[-1], ensure_ascii=False), flush=True)
-            write(output / 'summary.json', {'backend': args.backend, 'fixture': True, 'expertData': False, 'cases': rows})
+            write(output / 'summary.json', {'backend': 'native', 'fixture': True, 'expertData': False, 'cases': rows})
             count += 1
         if queue:
             rows.append({'event': event['name'], 'status': 'limit', 'unexecutedPaths': len(queue)})
-    summary = {'backend': args.backend, 'fixture': True, 'expertData': False, 'cases': rows,
+    summary = {'backend': 'native', 'fixture': True, 'expertData': False, 'cases': rows,
                'allBranchesVerified': False, 'scope': 'declared initial condition; no proof of full conditional or semantic coverage'}
     if getattr(args, 'case_spec', None) is not None:
         records = [json.loads((output / row['case'] / 'case.json').read_text()) for row in rows if row.get('case')]
@@ -381,15 +340,11 @@ def run(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--backend', choices=['learn', 'native'], required=True)
     parser.add_argument('--catalog', type=Path, default=Path(__file__).with_name('catalog.json'))
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument('--events', nargs='+')
     selection.add_argument('--case', help='cases.jsonの固定条件・期待を再実行（1設定）')
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--dotnet', type=Path)
-    parser.add_argument('--fixture-host', type=Path, default=REPO / 'local/learn_dll/event-fixture/bin/Release/net9.0/EventFixture.dll')
-    parser.add_argument('--learn-host-dir', type=Path)
     parser.add_argument('--policy-config', type=Path, default=default_config())
     parser.add_argument('--fixture', type=Path, help='追加のact/potions/add_cards/relics/deckを記載したJSON')
     parser.add_argument('--include-special', action='store_true')
@@ -422,8 +377,6 @@ def main():
             parser.error('fixtureの追加フィールドが不正')
     elif not args.case:
         args.fixture = {}
-    if args.backend == 'learn' and (args.dotnet is None or args.learn_host_dir is None):
-        parser.error('learnには--dotnetと--learn-host-dirが必要')
     if min(args.max_paths, args.max_steps, args.seconds, args.hp, args.max_hp) < 1 or args.hp > args.max_hp or args.gold < 0:
         parser.error('実行上限は正数、1 <= hp <= max-hp、gold >= 0を指定')
     result = run(args)
